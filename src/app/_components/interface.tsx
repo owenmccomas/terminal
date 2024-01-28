@@ -117,7 +117,7 @@ export default function Interface() {
     }
   }
 
-  const processCommand = (command: string) => {
+  const processCommand = async (command: string) => {
     const args = command.split(" ");
     const cmd = args[0]?.toLowerCase() ?? "";
     const cmdArgs = args.slice(1).join(" ");
@@ -175,7 +175,7 @@ export default function Interface() {
       case "signin":
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "Checking..."]);
         if (!session.data) {
-          signIn();
+          await signIn();
         } else
           setOutput((prevOutput) => [
             ...prevOutput,
@@ -190,7 +190,7 @@ export default function Interface() {
           "Goodbye",
         ]);
         if (session.data) {
-          signOut();
+          await signOut();
         } else
           setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "Goodbye"]);
         break;
