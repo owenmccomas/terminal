@@ -11,6 +11,7 @@ export default function Interface() {
   const [output, setOutput] = useState<string[]>([]);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
+  // eslint-disable-next-line no-unused-vars
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +70,7 @@ export default function Interface() {
       console.error("Error fetching notes", notesError);
       return ["Error fetching notes"];
     }
-    return allNotes?.map((note) => note.title) || [];
+    return allNotes?.map((note) => note.title) ?? [];
   };
 
   const { data: selectedNote, isLoading: isLoadingSelectedNote } =
@@ -84,7 +85,7 @@ export default function Interface() {
         setOutput((prevOutput) => [
           ...prevOutput,
           `> view ${selectedNote.title}`,
-          selectedNote.content || "No content available",
+          selectedNote.content ?? "No content available",
         ]);
       } else if (selectedNoteTitle && !selectedNote) {
         // Note is not found
@@ -248,9 +249,9 @@ export default function Interface() {
     >
       <div className="glow">
         <h1>
-          ` Welcome to Terminal Version 0.1.0 | This is a virtual terminal
+          Welcome to Terminal Version 0.1.0 | This is a virtual terminal
           interface. You can interact with the app by typing commands. For a
-          list of available commands, type 'help' and press Enter.`
+          list of available commands, type `help` and press Enter.
         </h1>
         <div className="output">
           {output.map((line, index) => (
