@@ -33,12 +33,12 @@ export default function Interface() {
     setInput(event.target.value);
   };
 
-  const handleInputSubmit = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputSubmit = async (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       if (isCreatingNote) {
         processNewNote(input);
       } else {
-        processCommand(input);
+        await processCommand(input);
       }
       setInput("");
     }
