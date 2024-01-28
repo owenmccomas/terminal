@@ -32,24 +32,35 @@ export default function Home() {
   };
 
   const processCommand = (command: string) => {
-    switch (command.toLowerCase()) {
+    const args = command.split(' ');
+    const cmd = (args[0]?.toLowerCase()) ?? "";
+    const cmdArgs = args.slice(1).join(' ');
+  
+    switch (cmd) {
       case "help":
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          "Available commands: help, ...",
-        ]);
+        setOutput(prevOutput => [...prevOutput, "Available commands: help, clear, about, date, time, echo, ..."]);
         break;
       case "clear":
         setOutput([]);
         break;
+      case "about":
+        setOutput(prevOutput => [...prevOutput, "This is a terminal-like interface built by Owen McComas. ..."]);
+        break;
+      case "date":
+        setOutput(prevOutput => [...prevOutput, `Current Date: ${new Date().toLocaleDateString()}`]);
+        break;
+      case "time":
+        setOutput(prevOutput => [...prevOutput, `Current Time: ${new Date().toLocaleTimeString()}`]);
+        break;
+      case "echo":
+        setOutput(prevOutput => [...prevOutput, cmdArgs]);
+        break;
       // Add more cases for other commands
       default:
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `Unknown command: ${command}`,
-        ]);
+        setOutput(prevOutput => [...prevOutput, `Unknown command: ${cmd}`]);
     }
   };
+  
 
   return (
     <main className="crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8" onClick={handleFocusInput}>
@@ -65,6 +76,8 @@ export default function Home() {
             <p key={index}>{line}</p>
           ))}
         </div>
+        <div className="flex row">
+        <p>&gt;&nbsp;</p>
         <input
           type="text"
           value={input}
@@ -73,6 +86,7 @@ export default function Home() {
           onKeyDown={handleInputSubmit}
           className="command-input glow"
         />
+        </div>
       </div>
     </main>
   );
