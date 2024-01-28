@@ -13,7 +13,6 @@ export default function Interface() {
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
-  const [isLoadingNote, setIsLoadingNote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
 
@@ -249,9 +248,9 @@ export default function Interface() {
     >
       <div className="glow">
         <h1>
-          Welcome to Terminal Version 0.1.0 | This is a virtual terminal
+          ` Welcome to Terminal Version 0.1.0 | This is a virtual terminal
           interface. You can interact with the app by typing commands. For a
-          list of available commands, type 'help' and press Enter.
+          list of available commands, type 'help' and press Enter.`
         </h1>
         <div className="output">
           {output.map((line, index) => (
