@@ -64,6 +64,7 @@ model User {
     accounts      Account[]
     sessions      Session[]
     posts         Post[]
+    notes         Note[]
 }
 
 model VerificationToken {
@@ -72,4 +73,17 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+model Note {
+    id        Int      @id @default(autoincrement())
+    title     String
+    content   String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    createdBy   User   @relation(fields: [createdById], references: [id])
+    createdById String
+
+    @@index([title])
 }
