@@ -11,7 +11,7 @@ export default function Interface() {
   const [output, setOutput] = useState<string[]>([]);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
-  // eslint-disable-next-line no-unused-vars
+  /* eslint-disable-next-line no-unused-vars */
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +36,7 @@ export default function Interface() {
   const handleInputSubmit = async (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       if (isCreatingNote) {
-        processNewNote(input);
+        await processNewNote(input);
       } else {
         await processCommand(input);
       }
