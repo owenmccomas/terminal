@@ -6,14 +6,14 @@ import { signIn } from "next-auth/react";
 
 import { api } from "~/trpc/react";
 
-// import { processNewNote } from "./create-note";
-
 export default function Interface() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState<string[]>([]);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
+  const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
+  const [isLoadingNote, setIsLoadingNote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
 
@@ -62,6 +62,42 @@ export default function Interface() {
     },
   });
 
+  const { data: allNotes, error: notesError } =
+    api.note.getAllNoteTitles.useQuery();
+
+  const fetchAllNotes = () => {
+    if (notesError) {
+      console.error("Error fetching notes", notesError);
+      return ["Error fetching notes"];
+    }
+    return allNotes?.map((note) => note.title) || [];
+  };
+
+  const { data: selectedNote, isLoading: isLoadingSelectedNote } =
+    api.note.getNoteByTitle.useQuery(selectedNoteTitle, {
+      enabled: !!selectedNoteTitle,
+    });
+
+  useEffect(() => {
+    if (!isLoadingSelectedNote) {
+      if (selectedNoteTitle && selectedNote) {
+        // Note is found
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> view ${selectedNote.title}`,
+          selectedNote.content || "No content available",
+        ]);
+      } else if (selectedNoteTitle && !selectedNote) {
+        // Note is not found
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> view ${selectedNoteTitle}`,
+          "Note not found",
+        ]);
+      }
+    }
+  }, [selectedNote, selectedNoteTitle, isLoadingSelectedNote]);
+
   function processNewNote(input: string) {
     if (!noteTitle) {
       // User is entering the title of the note
@@ -91,9 +127,24 @@ export default function Interface() {
         setOutput((prevOutput) => [
           ...prevOutput,
           `> ${cmd}`,
-          "Available commands: help, clear, about, date, time, echo, signin, signout, whoami",
+          "Available commands:",
+          "  help       - Displays this help message.",
+          "  clear      - Clears the terminal output.",
+          "  about      - Shows information about this terminal-like interface.",
+          "  date       - Displays the current date.",
+          "  time       - Displays the current time.",
+          "  echo       - Repeats back the text you enter. Usage: echo [text]",
+          "  signin     - Signs in a user. If already signed in, displays a welcome back message.",
+          "  signout    - Signs out the current user and displays a goodbye message.",
+          "  whoami     - Shows the name of the currently signed in user, or a message if not signed in.",
+          "  newnote    - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
+          "  viewnotes  - Lists titles of all available notes.",
+          "  view       - Selects a note for viewing based on the title. Usage: view [note title]",
+          "",
+          "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
         ]);
         break;
+
       case "clear":
         setOutput([]);
         break;
@@ -173,6 +224,13 @@ export default function Interface() {
           ]);
         }
         break;
+      case "viewnotes":
+        const noteTitles = fetchAllNotes();
+        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
+        break;
+      case "view":
+        setSelectedNoteTitle(cmdArgs);
+        break;
 
       // Add more cases for other commands
       default:
@@ -208,7 +266,8 @@ export default function Interface() {
             onChange={handleInputChange}
             ref={inputRef}
             onKeyDown={handleInputSubmit}
-            className="command-input glow"
+            className="command-input glow max-w-full
+            "
           />
         </div>
       </div>
