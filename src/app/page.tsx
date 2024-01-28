@@ -1,84 +1,79 @@
-import { unstable_noStore as noStore } from "next/cache";
-import Link from "next/link";
+"use client";
 
-import { CreatePost } from "~/app/_components/create-post";
-import { getServerAuthSession } from "~/server/auth";
-import { api } from "~/trpc/server";
+import { useState, useEffect, useRef } from "react";
 
-export default async function Home() {
-  noStore();
-  const hello = await api.post.hello.query({ text: "from tRPC" });
-  const session = await getServerAuthSession();
+export default function Home() {
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null); // Create a ref for the input
+
+  useEffect(() => {
+    // Focus on the input element after the component mounts
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const handleFocusInput = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(event.target.value);
+  };
+
+  const handleInputSubmit = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      processCommand(input);
+      setInput("");
+    }
+  };
+
+  const processCommand = (command: string) => {
+    switch (command.toLowerCase()) {
+      case "help":
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          "Available commands: help, ...",
+        ]);
+        break;
+      case "clear":
+        setOutput([]);
+        break;
+      // Add more cases for other commands
+      default:
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `Unknown command: ${command}`,
+        ]);
+    }
+  };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-      <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16 ">
-        <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-          Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
+    <main className="crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8" onClick={handleFocusInput}>
+      <div className="glow">
+        <h1>
+          Welcome to Terminal Version 0.1.0 |
+          This is a virtual terminal interface. You can interact with the app by
+          typing commands. For a list of available commands, type 'help' and
+          press Enter.
         </h1>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-          <Link
-            className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-            href="https://create.t3.gg/en/usage/first-steps"
-            target="_blank"
-          >
-            <h3 className="text-2xl font-bold">First Steps →</h3>
-            <div className="text-lg">
-              Just the basics - Everything you need to know to set up your
-              database and authentication.
-            </div>
-          </Link>
-          <Link
-            className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-            href="https://create.t3.gg/en/introduction"
-            target="_blank"
-          >
-            <h3 className="text-2xl font-bold">Documentation →</h3>
-            <div className="text-lg">
-              Learn more about Create T3 App, the libraries it uses, and how to
-              deploy it.
-            </div>
-          </Link>
+        <div className="output">
+          {output.map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
         </div>
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-2xl text-white">
-            {hello ? hello.greeting : "Loading tRPC query..."}
-          </p>
-
-          <div className="flex flex-col items-center justify-center gap-4">
-            <p className="text-center text-2xl text-white">
-              {session && <span>Logged in as {session.user?.name}</span>}
-            </p>
-            <Link
-              href={session ? "/api/auth/signout" : "/api/auth/signin"}
-              className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
-            >
-              {session ? "Sign out" : "Sign in"}
-            </Link>
-          </div>
-        </div>
-
-        <CrudShowcase />
+        <input
+          type="text"
+          value={input}
+          onChange={handleInputChange}
+          ref={inputRef}
+          onKeyDown={handleInputSubmit}
+          className="command-input glow"
+        />
       </div>
     </main>
-  );
-}
-
-async function CrudShowcase() {
-  const session = await getServerAuthSession();
-  if (!session?.user) return null;
-
-  const latestPost = await api.post.getLatest.query();
-
-  return (
-    <div className="w-full max-w-xs">
-      {latestPost ? (
-        <p className="truncate">Your most recent post: {latestPost.name}</p>
-      ) : (
-        <p>You have no posts yet.</p>
-      )}
-
-      <CreatePost />
-    </div>
   );
 }
