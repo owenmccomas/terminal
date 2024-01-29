@@ -5,6 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
 
 import { api } from "~/trpc/react";
+import { set } from "zod";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -232,6 +233,99 @@ export default function Interface() {
         setSelectedNoteTitle(cmdArgs);
         break;
 
+      case "bot":
+        if (args[1] === "ask") {
+          const question = args.slice(2).join(" ");
+          setOutput((prevOutput) => [...prevOutput, `> ${cmd} ${args[1]} thinking...`]);
+          try {
+            const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ question: question }),
+            });
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            const responseData = await response.json();
+            setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
+          } catch (error) {
+            console.error('Request failed:', error);
+            setOutput((prevOutput) => [...prevOutput, `> Error: ${error}`]);
+          }
+        }
+
+        else {
+          setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Unknown command: ${cmd}`]);
+        }
+        break;
+      case "draw":
+        const drawPrompt = args.slice(1).join(" ");
+        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Drawing: ${drawPrompt}`]);
+        try {
+          const response = await fetch('/api/ascii', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt: drawPrompt }),
+          });
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          const asciiArt = await response.text();
+          const asciiLines = asciiArt.split('\n');
+
+          // Add each line of ASCII art directly without adding borders
+          asciiLines.forEach((line) => {
+            setOutput((prevOutput) => [...prevOutput, line]);
+          });
+          setOutput((prevOutput) => [...prevOutput, `> End of drawing, maybe I need to work on my art skills`]);
+        } catch (error) {
+          console.error('Request failed:', error);
+          setOutput((prevOutput) => [...prevOutput, `> Error: ${error}`]);
+        }
+        break;
+
+      case "search":
+        // we will simply open a new tab with the search query on google
+        const searchQuery = args.slice(1).join(" ");
+        window.open(`https://www.google.com/search?q=${searchQuery}`, '_blank');
+        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Searching: ${searchQuery}`]);
+        break;
+
+      case "copylast":
+        const numLines = parseInt(cmdArgs, 10) || 1;
+        const startIndex = Math.max(output.length - numLines, 0);
+        const textToCopy = output.slice(startIndex).join("\n");
+        if (navigator.clipboard && window.isSecureContext) {
+          // Use clipboard API when available
+          try {
+            await navigator.clipboard.writeText(textToCopy);
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Copied ${numLines} line(s) to clipboard.`]);
+          } catch (err) {
+            console.error('Failed to copy text: ', err);
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Error: Unable to copy text to clipboard.`]);
+          }
+        } else {
+          // Fallback method for older browsers
+          const textArea = document.createElement("textarea");
+          textArea.value = textToCopy;
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          try {
+            document.execCommand('copy');
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Copied ${numLines} line(s) to clipboard.`]);
+          } catch (err) {
+            console.error('Failed to copy text: ', err);
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Error: Unable to copy text to clipboard.`]);
+          }
+          document.body.removeChild(textArea);
+        }
+        break;
+
       // Add more cases for other commands
       default:
         setOutput((prevOutput) => [
@@ -240,6 +334,7 @@ export default function Interface() {
           `Unknown command: ${cmd}`,
         ]);
     }
+
   };
 
   return (
