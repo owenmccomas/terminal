@@ -5,7 +5,6 @@ import { signOut, useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
 
 import { api } from "~/trpc/react";
-import { set } from "zod";
 
 export default function Interface() {
   const [input, setInput] = useState("");
