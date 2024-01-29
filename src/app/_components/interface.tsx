@@ -273,7 +273,7 @@ export default function Interface() {
             if (!response.ok) {
               throw new Error("Network response was not ok");
             }
-            const responseData:object = await response.json();
+            const responseData = await response.json();
             setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
           } catch (error) {
             console.error("Request failed:", error);
