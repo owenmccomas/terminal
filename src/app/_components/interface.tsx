@@ -15,6 +15,8 @@ export default function Interface() {
   // eslint-disable-next-line no-unused-vars
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
+  const [glowColor, setGlowColor] = useState("glow-amber");
+  const [inputColor, setInputColor] = useState("command-input-amber");
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
 
@@ -34,7 +36,9 @@ export default function Interface() {
     setInput(event.target.value);
   };
 
-  const handleInputSubmit = async (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputSubmit = async (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (event.key === "Enter") {
       if (isCreatingNote) {
         processNewNote(input);
@@ -118,6 +122,16 @@ export default function Interface() {
     }
   }
 
+  const toggleGlow = () => {
+    if (glowColor === "glow-amber") {
+      setGlowColor("glow-green");
+      setInputColor("command-input-green");
+    } else {
+      setGlowColor("glow-amber");
+      setInputColor("command-input-amber");
+    }
+  };
+
   const processCommand = async (command: string) => {
     const args = command.split(" ");
     const cmd = args[0]?.toLowerCase() ?? "";
@@ -141,6 +155,10 @@ export default function Interface() {
           "  newnote    - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
           "  viewnotes  - Lists titles of all available notes.",
           "  view       - Selects a note for viewing based on the title. Usage: view [note title]",
+          "  bot        - Interacts with an AI bot. Usage: bot ask [your question]",
+          "  draw       - Generates ASCII art based on a prompt. Usage: draw [prompt]",
+          "  search     - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
+          "  copylast   - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
           "",
           "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
         ]);
@@ -232,58 +250,75 @@ export default function Interface() {
       case "view":
         setSelectedNoteTitle(cmdArgs);
         break;
+      case "togglecolor":
+        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Toggled`]);
+        toggleGlow();
+        break;
 
       case "bot":
         if (args[1] === "ask") {
           const question = args.slice(2).join(" ");
-          setOutput((prevOutput) => [...prevOutput, `> ${cmd} ${args[1]} thinking...`]);
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} ask ${question}`,
+            `bot ${args[1]} thinking...`,
+          ]);
           try {
-            const response = await fetch('/api/chat', {
-              method: 'POST',
+            const response = await fetch("/api/chat", {
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
               },
               body: JSON.stringify({ question: question }),
             });
             if (!response.ok) {
-              throw new Error('Network response was not ok');
+              throw new Error("Network response was not ok");
             }
             const responseData = await response.json();
             setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
           } catch (error) {
-            console.error('Request failed:', error);
+            console.error("Request failed:", error);
             setOutput((prevOutput) => [...prevOutput, `> Error: ${error}`]);
           }
-        }
-
-        else {
-          setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Unknown command: ${cmd}`]);
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Unknown command: ${cmd}`,
+          ]);
         }
         break;
       case "draw":
         const drawPrompt = args.slice(1).join(" ");
-        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Drawing: ${drawPrompt}`]);
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd} ${drawPrompt}`,
+          `Drawing: ${drawPrompt}`,
+        ]);
         try {
-          const response = await fetch('/api/ascii', {
-            method: 'POST',
+          const response = await fetch("/api/ascii", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({ prompt: drawPrompt }),
           });
           if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error("Network response was not ok");
           }
           const asciiArt = await response.text();
-          const asciiLines = asciiArt.split('\n');
+          const asciiLines = asciiArt.split("\n");
 
           // Add each line of ASCII art directly without adding borders
           asciiLines.forEach((line) => {
             setOutput((prevOutput) => [...prevOutput, line]);
           });
-          setOutput((prevOutput) => [...prevOutput, `> End of drawing, maybe I need to work on my art skills`]);
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> End of drawing, maybe I need to work on my art skills`,
+          ]);
         } catch (error) {
-          console.error('Request failed:', error);
+          console.error("Request failed:", error);
           setOutput((prevOutput) => [...prevOutput, `> Error: ${error}`]);
         }
         break;
@@ -291,8 +326,12 @@ export default function Interface() {
       case "search":
         // we will simply open a new tab with the search query on google
         const searchQuery = args.slice(1).join(" ");
-        window.open(`https://www.google.com/search?q=${searchQuery}`, '_blank');
-        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Searching: ${searchQuery}`]);
+        window.open(`https://www.google.com/search?q=${searchQuery}`, "_blank");
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd}`,
+          `Searching: ${searchQuery}`,
+        ]);
         break;
 
       case "copylast":
@@ -303,10 +342,18 @@ export default function Interface() {
           // Use clipboard API when available
           try {
             await navigator.clipboard.writeText(textToCopy);
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Copied ${numLines} line(s) to clipboard.`]);
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Copied ${numLines} line(s) to clipboard.`,
+            ]);
           } catch (err) {
-            console.error('Failed to copy text: ', err);
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Error: Unable to copy text to clipboard.`]);
+            console.error("Failed to copy text: ", err);
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Error: Unable to copy text to clipboard.`,
+            ]);
           }
         } else {
           // Fallback method for older browsers
@@ -316,11 +363,19 @@ export default function Interface() {
           textArea.focus();
           textArea.select();
           try {
-            document.execCommand('copy');
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Copied ${numLines} line(s) to clipboard.`]);
+            document.execCommand("copy");
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Copied ${numLines} line(s) to clipboard.`,
+            ]);
           } catch (err) {
-            console.error('Failed to copy text: ', err);
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Error: Unable to copy text to clipboard.`]);
+            console.error("Failed to copy text: ", err);
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Error: Unable to copy text to clipboard.`,
+            ]);
           }
           document.body.removeChild(textArea);
         }
@@ -334,21 +389,20 @@ export default function Interface() {
           `Unknown command: ${cmd}`,
         ]);
     }
-
   };
 
   return (
     <main
-      className="crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8"
+      className={`crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8 ${glowColor}`}
       onClick={handleFocusInput}
     >
-      <div className="glow">
+      <div>
         <h1>
           Welcome to Terminal Version 0.1.0 | This is a virtual terminal
           interface. You can interact with the app by typing commands. For a
           list of available commands, type `help` and press Enter.
         </h1>
-        <div className="output">
+        <div className={`output`}>
           {output.map((line, index) => (
             <p key={index}>{line}</p>
           ))}
@@ -361,8 +415,7 @@ export default function Interface() {
             onChange={handleInputChange}
             ref={inputRef}
             onKeyDown={handleInputSubmit}
-            className="command-input glow max-w-full
-            "
+            className={`${glowColor} ${inputColor} max-w-full`}
           />
         </div>
       </div>

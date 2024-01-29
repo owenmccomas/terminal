@@ -9,13 +9,19 @@
   font-style: normal;
 }
 
-.glow {
+.glow-amber {
   color: #f59e0b;
   text-shadow:
     0 0 5px #f59e0b,
     0 0 8px #f59e0b;
 }
 
+.glow-green {
+  color: #4AF626;
+  text-shadow:
+    0 0 5px #4AF626,
+    0 0 8px #4AF626;
+}
 
 .crt {
   position: relative;
@@ -159,12 +165,20 @@
   }
 }
 
-.command-input {
+.command-input-amber {
   width: 100%;
   background-color: #0a0a0a;
   border: none;
   outline: none;
   color: #f59e0b;
+}
+
+.command-input-green {
+  width: 100%;
+  background-color: #0a0a0a;
+  border: none;
+  outline: none;
+  color: #4AF626;
 }
 
 @keyframes blink {
@@ -206,4 +220,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #ecaa38;
   /* Slightly lighter when hovering */
+}
+
+.glow-amber::selection {
+  background-color: #f59e0b;
+  color: #0a0a0a;              
+}
+
+/* Custom selection styles for .glow-green */
+.glow-green::selection {
+  background-color: #4AF626; 
+  color: #0a0a0a;               
 }
