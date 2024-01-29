@@ -273,11 +273,15 @@ export default function Interface() {
             if (!response.ok) {
               throw new Error("Network response was not ok");
             }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const responseData = await response.json();
             setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
           } catch (error) {
             console.error("Request failed:", error);
-            setOutput((prevOutput) => [...prevOutput, `> Error: ${error as string}`]);
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> Error: ${error as string}`,
+            ]);
           }
         } else {
           setOutput((prevOutput) => [
@@ -318,7 +322,10 @@ export default function Interface() {
           ]);
         } catch (error) {
           console.error("Request failed:", error);
-          setOutput((prevOutput) => [...prevOutput, `> Error: ${error as string}`]);
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> Error: ${error as string}`,
+          ]);
         }
         break;
 
