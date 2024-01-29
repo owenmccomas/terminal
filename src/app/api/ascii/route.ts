@@ -1,4 +1,4 @@
-import { openai } from "../chat/route";
+import { openai } from "utils/openai";
 
 // Set the runtime to edge for best performance
 export const runtime = 'edge';
