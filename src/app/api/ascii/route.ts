@@ -3,8 +3,12 @@ import { openai } from "utils/openai";
 // Set the runtime to edge for best performance
 export const runtime = 'edge';
 
+interface Data {
+    prompt: string;
+}
+
 export async function POST(req: Request) {
-    const { prompt } = await req.json();
+    const { prompt } = await req.json() as Data;
 
     // Ask OpenAI for a chat completion given the prompt
     const response = await openai.chat.completions.create({

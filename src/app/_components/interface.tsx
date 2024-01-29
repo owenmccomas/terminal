@@ -273,11 +273,11 @@ export default function Interface() {
             if (!response.ok) {
               throw new Error("Network response was not ok");
             }
-            const responseData = await response.json();
+            const responseData:object = await response.json();
             setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
           } catch (error) {
             console.error("Request failed:", error);
-            setOutput((prevOutput) => [...prevOutput, `> Error: ${error}`]);
+            setOutput((prevOutput) => [...prevOutput, `> Error: ${error as string}`]);
           }
         } else {
           setOutput((prevOutput) => [
@@ -318,7 +318,7 @@ export default function Interface() {
           ]);
         } catch (error) {
           console.error("Request failed:", error);
-          setOutput((prevOutput) => [...prevOutput, `> Error: ${error}`]);
+          setOutput((prevOutput) => [...prevOutput, `> Error: ${error as string}`]);
         }
         break;
 
