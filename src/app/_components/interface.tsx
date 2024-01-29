@@ -5,6 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
 
 import { api } from "~/trpc/react";
+import { type Bookmark } from "@prisma/client";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -18,6 +19,7 @@ export default function Interface() {
   const [inputColor, setInputColor] = useState("command-input-amber");
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
+  const context = api.useUtils();
 
   useEffect(() => {
     if (inputRef.current) {
@@ -101,6 +103,38 @@ export default function Interface() {
       }
     }
   }, [selectedNote, selectedNoteTitle, isLoadingSelectedNote]);
+
+  const addBookmarkHandler = api.bookmark.add.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+  const deleteBookmarkHandler = api.bookmark.remove.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  const addBookmark = (name: string, url: string) => {
+    if (!session.data) throw new Error("User not signed in");
+    addBookmarkHandler.mutate({
+      name,
+      url: "https://" + url,
+      userId: session.data?.user.id,
+    });
+    return `Bookmark '${name}' added.`;
+  };
+
+  const deleteBookmark = (name: string) => {
+    if (!session.data) throw new Error("User not signed in");
+    if (!bookmarks) throw new Error("Bookmarks not loaded");
+    const bookmarkId = bookmarks?.find(
+      (bookmark) => bookmark.name === name,
+    )?.id;
+    if (!bookmarkId) throw new Error("Bookmark not found");
+    deleteBookmarkHandler.mutate({ id: bookmarkId });
+    return `Bookmark '${name}' deleted.`;
+  };
 
   function processNewNote(input: string) {
     if (!noteTitle) {
@@ -387,6 +421,114 @@ export default function Interface() {
         }
         break;
 
+      case "togglelines":
+        localStorage.setItem(
+          "lineNumber",
+          localStorage.getItem("lineNumber") === "showLines"
+            ? "hideLines"
+            : "showLines" || "showLines",
+        );
+        break;
+
+      case "bm":
+        const bmArgs = command.split(" ").slice(1); // Get arguments after "bm"
+        const bmSubCmd = bmArgs[0];
+
+        switch (bmSubCmd) {
+          case "-add":
+            if (!bmArgs[1]) {
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Missing bookmark name`,
+              ]);
+              break;
+            }
+            if (!bmArgs[2]) {
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Missing bookmark URL`,
+              ]);
+              break;
+            }
+            const bookmarkName = bmArgs[1]?.replace(/^"|"$/g, ""); // Remove quotes
+            const bookmarkUrl = bmArgs[2];
+            const addResult = addBookmark(bookmarkName, bookmarkUrl);
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, addResult]);
+            break;
+
+          case "-ls":
+            if (bookmarks?.length === 0) {
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `No bookmarks found`,
+              ]);
+            } else {
+              // Find the length of the longest bookmark name
+              const maxLength = bookmarks?.reduce(
+                (max, bookmark) => Math.max(max, bookmark.name.length),
+                0,
+              );
+
+              // Add a slight delay between each bookmark
+              bookmarks?.forEach((bookmark, index) => {
+                setTimeout(() => {
+                  const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
+                  setOutput((prevOutput) => [
+                    ...prevOutput,
+                    `> ${paddedName} | ${bookmark.url}`,
+                  ]);
+                }, index * 100); // 500 milliseconds delay for each item
+              });
+            }
+            break;
+
+          case "-rm":
+            if (!bmArgs[1]) {
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Missing bookmark name`,
+              ]);
+              break;
+            }
+            const bookmarkToRemove = bmArgs[1]?.replace(/^"|"$/g, ""); // Remove quotes
+            const removeResult = deleteBookmark(bookmarkToRemove);
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              removeResult,
+            ]);
+            break;
+
+          // You can add more subcommands here if needed
+
+          default:
+            // Treat as a bookmark name to open
+            const bookmarkNameToUse = bmArgs.join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
+            const bookmark = bookmarks?.find(
+              (b) => b.name === bookmarkNameToUse,
+            );
+
+            if (bookmark) {
+              window.open(bookmark.url, "_blank");
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Opening bookmark: ${bookmark.name}`,
+              ]);
+            } else {
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Bookmark '${bookmarkNameToUse}' not found`,
+              ]);
+            }
+        }
+        break;
+
       // Add more cases for other commands
       default:
         setOutput((prevOutput) => [
@@ -396,6 +538,10 @@ export default function Interface() {
         ]);
     }
   };
+
+  const bookmarks = api.bookmark.list?.useQuery({
+    userId: session.data?.user.id,
+  }).data;
 
   return (
     <main
@@ -410,10 +556,20 @@ export default function Interface() {
         </h1>
         <div className={`output`}>
           {output.map((line, index) => (
-            <p key={index}>{line}</p>
+            <p key={index}>
+              {typeof window !== "undefined" &&
+                localStorage.getItem("lineNumber") === "showLines" && (
+                  <span className="mr-3">{index}</span>
+                )}
+              {line}
+            </p>
           ))}
         </div>
         <div className="row flex">
+          {typeof window !== "undefined" &&
+            localStorage.getItem("lineNumber") === "showLines" && (
+              <span className="mr-3">{output.length}</span>
+            )}
           <p>&gt;&nbsp;</p>
           <input
             type="text"
@@ -421,7 +577,7 @@ export default function Interface() {
             onChange={handleInputChange}
             ref={inputRef}
             onKeyDown={handleInputSubmit}
-            className={`${glowColor} ${inputColor} max-w-full`}
+            className={`${glowColor} ${inputColor} max-w-full `}
           />
         </div>
       </div>
