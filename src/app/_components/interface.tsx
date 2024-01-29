@@ -480,7 +480,7 @@ export default function Interface() {
                     ...prevOutput,
                     `> ${paddedName} | ${bookmark.url}`,
                   ]);
-                }, index * 100); // 500 milliseconds delay for each item
+                }, index * 100); // 100 milliseconds delay for each item
               });
             }
             break;
