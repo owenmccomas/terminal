@@ -17,6 +17,10 @@
 }
 */
 
+.pre {
+  font-family: "Cascadia Code";
+}
+
 .crt {
   position: relative;
   overflow: hidden;
