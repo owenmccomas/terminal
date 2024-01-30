@@ -5,6 +5,9 @@ import { signOut, useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
 
 import { api } from "~/trpc/react";
+
+import ASCIILoadingBar from "../_components/loading-bar";
+
 import { type Bookmark } from "@prisma/client";
 
 export default function Interface() {
@@ -12,14 +15,41 @@ export default function Interface() {
   const [output, setOutput] = useState<string[]>([]);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isContentLoaded, setIsContentLoaded] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
-  const [glowColor, setGlowColor] = useState("glow-amber");
-  const [inputColor, setInputColor] = useState("command-input-amber");
+  const [textColor, setTextColor] = useState("#f59e0b");
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
+
+  useEffect(() => {
+    // Simulate loading and fetch localStorage content
+    const loadingDuration = 1200; // 1.2 seconds
+    let interval: number;
+    let timeout: number = setTimeout(() => {
+      interval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            // Here, fetch and set your localStorage content
+            // ...
+
+            setIsContentLoaded(true);
+            return 100;
+          }
+          return prev + 5; // Increment progress
+        });
+      }, loadingDuration / 20) as unknown as number; // Divide duration by number of increments
+    }, 0) as unknown as number;
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (inputRef.current) {
@@ -155,15 +185,53 @@ export default function Interface() {
     }
   }
 
-  const toggleGlow = () => {
-    if (glowColor === "glow-amber") {
-      setGlowColor("glow-green");
-      setInputColor("command-input-green");
-    } else {
-      setGlowColor("glow-amber");
-      setInputColor("command-input-amber");
-    }
+  function getTextStyle(color: string) {
+    return {
+      color: color,
+      textShadow: `0 0 5px ${color}, 0 0 8px ${color}`,
+    };
+  }
+
+  function getInputStyle(color: string) {
+    return {
+      color: color,
+      backgroundColor: "2a2a2a",
+      borderColor: color,
+      textShadow: `0 0 5px ${color}, 0 0 8px ${color}`,
+    };
+  }
+
+  const changeTextColor = (color: string) => {
+    setTextColor(color);
+    localStorage.setItem("textColor", color);
   };
+
+  useEffect(() => {
+    const savedColor = localStorage.getItem("textColor");
+    if (savedColor) {
+      setTextColor(savedColor);
+    }
+    // Rest of your useEffect code
+  }, []);
+
+  useEffect(() => {
+    const totalTime = 1200; // Total time for loading in milliseconds (1.2 seconds)
+    const intervalTime = 10; // Interval time in milliseconds
+    const increment = (100 * intervalTime) / totalTime; // Increment per interval
+
+    const interval = setInterval(() => {
+      setLoadingProgress((prevProgress) => {
+        const nextProgress = prevProgress + increment;
+        if (nextProgress >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return nextProgress;
+      });
+    }, intervalTime);
+
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, []);
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -283,10 +351,10 @@ export default function Interface() {
       case "view":
         setSelectedNoteTitle(cmdArgs);
         break;
-      case "togglecolor":
-        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Toggled`]);
-        toggleGlow();
-        break;
+      // case "togglecolor":
+      //   setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Toggled`]);
+      //   toggleGlow();
+      //   break;
 
       case "bot":
         if (args[1] === "ask") {
@@ -528,6 +596,18 @@ export default function Interface() {
             }
         }
         break;
+      case "color":
+        const colorCode = cmdArgs;
+        if (/^#[0-9A-F]{6}$/i.test(colorCode)) {
+          changeTextColor(colorCode);
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> Color changed to ${colorCode}`,
+          ]);
+        } else {
+          setOutput((prevOutput) => [...prevOutput, `> Invalid color code`]);
+        }
+        break;
 
       // Add more cases for other commands
       default:
@@ -543,9 +623,27 @@ export default function Interface() {
     userId: session.data?.user.id,
   }).data;
 
+  if (!isContentLoaded) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <ASCIILoadingBar progress={loadingProgress} />
+      </div>
+    );
+  }
+
+  // Render the rest of your interface here
+
   return (
     <main
-      className={`crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8 ${glowColor}`}
+      style={getTextStyle(textColor)}
+      className={`crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8 ${textColor} `}
       onClick={handleFocusInput}
     >
       <div>
@@ -577,7 +675,8 @@ export default function Interface() {
             onChange={handleInputChange}
             ref={inputRef}
             onKeyDown={handleInputSubmit}
-            className={`${glowColor} ${inputColor} max-w-full `}
+            style={getInputStyle(textColor)}
+            className={`w-full bg-neutral-950 outline-none`}
           />
         </div>
       </div>
