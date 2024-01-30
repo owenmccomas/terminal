@@ -8,6 +8,14 @@
   font-weight: normal;
   font-style: normal;
 }
+/* 
+.glow-amber {
+  color: #f59e0b;
+  text-shadow:
+    0 0 5px #f59e0b,
+    0 0 8px #f59e0b;
+}
+*/
 
 .crt {
   position: relative;

@@ -627,24 +627,34 @@ export default function Interface() {
   };
 
   const handleColorCommand = (cmd: string, args: string[]) => {
-    const cmdArgs = args.slice(1).join(" ");
+    const colorArg = args[1] || 'default';
 
-    const colorCode = cmdArgs;
-    if (/^#[0-9A-F]{6}$/i.test(colorCode)) {
-      changeTextColor(colorCode);
-      setOutput((prevOutput) => [
-        ...prevOutput,
-        `> ${cmd} ${colorCode}`,
-        `Color changed to ${colorCode}`,
-      ]);
-    } else {
-      setOutput((prevOutput) => [
-        ...prevOutput,
-        `> ${cmd} ${colorCode}`,
-        `Invalid color code. if you want to know a hex code, try 'bot ask what is the hex code for [color]', and make sure you put a # at the beginning`,
-      ]);
+    // Check if the command is 'color default'
+    if (colorArg === 'default') {
+        changeTextColor('#f59e0b');
+        setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} ${colorArg}`,
+            `Color changed to default (#f59e0b)`,
+        ]);
     }
-  };
+    else if (/^#[0-9A-F]{6}$/i.test(colorArg)) {
+        // If it's not 'default', then process as normal hex color code
+        changeTextColor(colorArg);
+        setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} ${colorArg}`,
+            `Color changed to ${colorArg}`,
+        ]);
+    } else {
+        // Handle invalid color code
+        setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} ${colorArg}`,
+            `Invalid color code. Try 'color default' for default color or 'color #xxxxxx' for a custom hex code. If you want to know a hexcode try 'bot ask, what is the hex code for [color]'`,
+        ]);
+    }
+};
 
   const handleUnknownCommand = (cmd: string) => {
     setOutput((prevOutput) => [
