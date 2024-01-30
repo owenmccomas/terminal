@@ -8,8 +8,6 @@ import { api } from "~/trpc/react";
 
 import ASCIILoadingBar from "../_components/loading-bar";
 
-import { type Bookmark } from "@prisma/client";
-
 export default function Interface() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState<string[]>([]);
@@ -56,6 +54,10 @@ export default function Interface() {
       inputRef.current.focus();
     }
   }, []);
+
+  const bookmarks = api.bookmark.list?.useQuery({
+    userId: session.data?.user.id,
+  }).data;
 
   const handleFocusInput = () => {
     if (inputRef.current) {
@@ -354,33 +356,77 @@ export default function Interface() {
       case "view":
         setSelectedNoteTitle(cmdArgs);
         break;
-      // case "togglecolor":
-      //   setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Toggled`]);
-      //   toggleGlow();
-      //   break;
+      }
+    }
 
-      case "bot":
-        if (args[1] === "ask") {
-          const question = args.slice(2).join(" ");
+        const handleBotCommand = async (cmd: string, args: string[]) => {
+          if (args[1] === "ask") {
+            const question = args.slice(2).join(" ");
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd} ask ${question}`,
+              `bot ${args[1]} thinking...`,
+            ]);
+            try {
+              const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ question: question }),
+              });
+              if (!response.ok) {
+                throw new Error("Network response was not ok");
+              }
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              const responseData = await response.json();
+              setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
+            } catch (error) {
+              console.error("Request failed:", error);
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> Error: ${error as string}`,
+              ]);
+            }
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Unknown command: ${cmd}`,
+            ]);
+          }
+        
+  }
+
+        const handleDrawCommand = async (cmd: string, args: string[]) => {
+          const drawPrompt = args.slice(1).join(" ");
           setOutput((prevOutput) => [
             ...prevOutput,
-            `> ${cmd} ask ${question}`,
-            `bot ${args[1]} thinking...`,
+            `> ${cmd} ${drawPrompt}`,
+            `Drawing: ${drawPrompt}`,
           ]);
           try {
-            const response = await fetch("/api/chat", {
+            const response = await fetch("/api/ascii", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ question: question }),
+              body: JSON.stringify({ prompt: drawPrompt }),
             });
             if (!response.ok) {
               throw new Error("Network response was not ok");
             }
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            const responseData = await response.json();
-            setOutput((prevOutput) => [...prevOutput, `> ${responseData}`]);
+            const asciiArt = await response.text();
+            const asciiLines = asciiArt.split("\n");
+
+            // Add each line of ASCII art directly without adding borders
+            asciiLines.forEach((line) => {
+              setOutput((prevOutput) => [...prevOutput, line]);
+            });
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> End of drawing, maybe I need to work on my art skills`,
+            ]);
           } catch (error) {
             console.error("Request failed:", error);
             setOutput((prevOutput) => [
@@ -388,306 +434,287 @@ export default function Interface() {
               `> Error: ${error as string}`,
             ]);
           }
-        } else {
+        };
+
+        const handleSearchCommand = (cmd: string, args: string[]) => {
+          const searchQuery = args.slice(1).join(" ");
+          window.open(
+            `https://www.google.com/search?q=${searchQuery}`,
+            "_blank",
+          );
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Searching: ${searchQuery}`,
+          ]);
+        };
+
+        const handleCopyLastCommand = async (cmd: string, args: string[]) => {
+        const cmdArgs = args.slice(1).join(" ");
+
+          const numLines = parseInt(cmdArgs, 10) || 1;
+          const startIndex = Math.max(output.length - numLines, 0);
+          const textToCopy = output.slice(startIndex).join("\n");
+          if (navigator.clipboard && window.isSecureContext) {
+            // Use clipboard API when available
+            try {
+              await navigator.clipboard.writeText(textToCopy);
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Copied ${numLines} line(s) to clipboard.`,
+              ]);
+            } catch (err) {
+              console.error("Failed to copy text: ", err);
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Error: Unable to copy text to clipboard.`,
+              ]);
+            }
+          } else {
+            // Fallback method for older browsers
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+              document.execCommand("copy");
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Copied ${numLines} line(s) to clipboard.`,
+              ]);
+            } catch (err) {
+              console.error("Failed to copy text: ", err);
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                `Error: Unable to copy text to clipboard.`,
+              ]);
+            }
+            document.body.removeChild(textArea);
+          }
+        };
+
+        const handleToggleLinesCommand = () => {
+          localStorage.setItem(
+            "lineNumber",
+            localStorage.getItem("lineNumber") === "showLines"
+              ? "hideLines"
+              : "showLines" || "showLines",
+          );
+        };
+
+        const handleBookmarkCommand = (cmd: string, args: string[]) => {
+          const command = args[0];
+          if (!command) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Missing subcommand. Available subcommands: -add, -ls, -rm`,
+            ]);
+            return;
+          }
+
+          const bmArgs = command.split(" ").slice(1); // Get arguments after "bm"
+          const bmSubCmd = bmArgs[0];
+
+          switch (bmSubCmd) {
+            case "-add":
+              if (!bmArgs[1]) {
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${cmd}`,
+                  `Missing bookmark name`,
+                ]);
+                break;
+              }
+              if (!bmArgs[2]) {
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${cmd}`,
+                  `Missing bookmark URL`,
+                ]);
+                break;
+              }
+              const bookmarkName = bmArgs[1]?.replace(/^"|"$/g, ""); // Remove quotes
+              const bookmarkUrl = bmArgs[2];
+              const addResult = addBookmark(bookmarkName, bookmarkUrl);
+              setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, addResult]);
+              break;
+
+            case "-ls":
+              if (bookmarks?.length === 0) {
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${cmd}`,
+                  `No bookmarks found`,
+                ]);
+              } else {
+                // Find the length of the longest bookmark name
+                const maxLength = bookmarks?.reduce(
+                  (max, bookmark) => Math.max(max, bookmark.name.length),
+                  0,
+                );
+
+                // Add a slight delay between each bookmark
+                bookmarks?.forEach((bookmark, index) => {
+                  setTimeout(() => {
+                    const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
+                    setOutput((prevOutput) => [
+                      ...prevOutput,
+                      `> ${paddedName} | ${bookmark.url}`,
+                    ]);
+                  }, index * 100); // 100 milliseconds delay for each item
+                });
+              }
+              break;
+
+            case "-rm":
+              if (!bmArgs[1]) {
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${cmd}`,
+                  `Missing bookmark name`,
+                ]);
+                break;
+              }
+              const bookmarkToRemove = bmArgs[1]?.replace(/^"|"$/g, ""); // Remove quotes
+              const removeResult = deleteBookmark(bookmarkToRemove);
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd}`,
+                removeResult,
+              ]);
+              break;
+
+            // You can add more subcommands here if needed
+
+            default:
+              // Treat as a bookmark name to open
+              const bookmarkNameToUse = bmArgs.join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
+              const bookmark = bookmarks?.find(
+                (b) => b.name === bookmarkNameToUse,
+              );
+
+              if (bookmark) {
+                window.open(bookmark.url, "_blank");
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${cmd}`,
+                  `Opening bookmark: ${bookmark.name}`,
+                ]);
+              } else {
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${cmd}`,
+                  `Bookmark '${bookmarkNameToUse}' not found`,
+                ]);
+              }
+          }
+        };
+
+        const handleColorCommand = (cmd: string, args: string[]) => {
+        const cmdArgs = args.slice(1).join(" ");
+
+          const colorCode = cmdArgs;
+          if (/^#[0-9A-F]{6}$/i.test(colorCode)) {
+            changeTextColor(colorCode);
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd} ${colorCode}`,
+              `Color changed to ${colorCode}`,
+            ]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd} ${colorCode}`,
+              `Invalid color code. if you want to know a hex code, try 'bot ask what is the hex code for [color]', and make sure you put a # at the beginning`,
+            ]);
+          }
+        };
+
+        const handleUnknownCommand = (cmd: string) => {
           setOutput((prevOutput) => [
             ...prevOutput,
             `> ${cmd}`,
             `Unknown command: ${cmd}`,
           ]);
-        }
-        break;
-      case "draw":
-        const drawPrompt = args.slice(1).join(" ");
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `> ${cmd} ${drawPrompt}`,
-          `Drawing: ${drawPrompt}`,
-        ]);
-        try {
-          const response = await fetch("/api/ascii", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ prompt: drawPrompt }),
-          });
-          if (!response.ok) {
-            throw new Error("Network response was not ok");
-          }
-          const asciiArt = await response.text();
-          const asciiLines = asciiArt.split("\n");
+        };
 
-          // Add each line of ASCII art directly without adding borders
-          asciiLines.forEach((line) => {
-            setOutput((prevOutput) => [...prevOutput, line]);
-          });
-          setOutput((prevOutput) => [
-            ...prevOutput,
-            `> End of drawing, maybe I need to work on my art skills`,
-          ]);
-        } catch (error) {
-          console.error("Request failed:", error);
-          setOutput((prevOutput) => [
-            ...prevOutput,
-            `> Error: ${error as string}`,
-          ]);
-        }
-        break;
+        const handleCommand = async (cmd: string) => {
+          const args = cmd.split(" ");
+          const command = args[0];
 
-      case "search":
-        // we will simply open a new tab with the search query on google
-        const searchQuery = args.slice(1).join(" ");
-        window.open(`https://www.google.com/search?q=${searchQuery}`, "_blank");
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `> ${cmd}`,
-          `Searching: ${searchQuery}`,
-        ]);
-        break;
-
-      case "copylast":
-        const numLines = parseInt(cmdArgs, 10) || 1;
-        const startIndex = Math.max(output.length - numLines, 0);
-        const textToCopy = output.slice(startIndex).join("\n");
-        if (navigator.clipboard && window.isSecureContext) {
-          // Use clipboard API when available
-          try {
-            await navigator.clipboard.writeText(textToCopy);
-            setOutput((prevOutput) => [
-              ...prevOutput,
-              `> ${cmd}`,
-              `Copied ${numLines} line(s) to clipboard.`,
-            ]);
-          } catch (err) {
-            console.error("Failed to copy text: ", err);
-            setOutput((prevOutput) => [
-              ...prevOutput,
-              `> ${cmd}`,
-              `Error: Unable to copy text to clipboard.`,
-            ]);
-          }
-        } else {
-          // Fallback method for older browsers
-          const textArea = document.createElement("textarea");
-          textArea.value = textToCopy;
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          try {
-            document.execCommand("copy");
-            setOutput((prevOutput) => [
-              ...prevOutput,
-              `> ${cmd}`,
-              `Copied ${numLines} line(s) to clipboard.`,
-            ]);
-          } catch (err) {
-            console.error("Failed to copy text: ", err);
-            setOutput((prevOutput) => [
-              ...prevOutput,
-              `> ${cmd}`,
-              `Error: Unable to copy text to clipboard.`,
-            ]);
-          }
-          document.body.removeChild(textArea);
-        }
-        break;
-
-      case "togglelines":
-        localStorage.setItem(
-          "lineNumber",
-          localStorage.getItem("lineNumber") === "showLines"
-            ? "hideLines"
-            : "showLines" || "showLines",
-        );
-        break;
-
-      case "bm":
-        const bmArgs = command.split(" ").slice(1); // Get arguments after "bm"
-        const bmSubCmd = bmArgs[0];
-
-        switch (bmSubCmd) {
-          case "-add":
-            if (!bmArgs[1]) {
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${cmd}`,
-                `Missing bookmark name`,
-              ]);
+          switch (command) {
+            case "bot":
+              handleBotCommand(cmd, args);
               break;
-            }
-            if (!bmArgs[2]) {
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${cmd}`,
-                `Missing bookmark URL`,
-              ]);
+            case "draw":
+              handleDrawCommand(cmd, args);
               break;
-            }
-            const bookmarkName = bmArgs[1]?.replace(/^"|"$/g, ""); // Remove quotes
-            const bookmarkUrl = bmArgs[2];
-            const addResult = addBookmark(bookmarkName, bookmarkUrl);
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, addResult]);
-            break;
-
-          case "-ls":
-            if (bookmarks?.length === 0) {
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${cmd}`,
-                `No bookmarks found`,
-              ]);
-            } else {
-              // Find the length of the longest bookmark name
-              const maxLength = bookmarks?.reduce(
-                (max, bookmark) => Math.max(max, bookmark.name.length),
-                0,
-              );
-
-              // Add a slight delay between each bookmark
-              bookmarks?.forEach((bookmark, index) => {
-                setTimeout(() => {
-                  const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
-                  setOutput((prevOutput) => [
-                    ...prevOutput,
-                    `> ${paddedName} | ${bookmark.url}`,
-                  ]);
-                }, index * 100); // 100 milliseconds delay for each item
-              });
-            }
-            break;
-
-          case "-rm":
-            if (!bmArgs[1]) {
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${cmd}`,
-                `Missing bookmark name`,
-              ]);
+            case "search":
+              handleSearchCommand(cmd, args);
               break;
-            }
-            const bookmarkToRemove = bmArgs[1]?.replace(/^"|"$/g, ""); // Remove quotes
-            const removeResult = deleteBookmark(bookmarkToRemove);
-            setOutput((prevOutput) => [
-              ...prevOutput,
-              `> ${cmd}`,
-              removeResult,
-            ]);
-            break;
-
-          // You can add more subcommands here if needed
-
-          default:
-            // Treat as a bookmark name to open
-            const bookmarkNameToUse = bmArgs.join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
-            const bookmark = bookmarks?.find(
-              (b) => b.name === bookmarkNameToUse,
-            );
-
-            if (bookmark) {
-              window.open(bookmark.url, "_blank");
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${cmd}`,
-                `Opening bookmark: ${bookmark.name}`,
-              ]);
-            } else {
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${cmd}`,
-                `Bookmark '${bookmarkNameToUse}' not found`,
-              ]);
-            }
+            case "copylast":
+              handleCopyLastCommand(cmd, args);
+              break;
+            case "togglelines":
+              handleToggleLinesCommand();
+              break;
+            case "bm":
+              handleBookmarkCommand(cmd, args);
+              break;
+            case "color":
+              handleColorCommand(cmd, args);
+              break;
+            default:
+              handleUnknownCommand(cmd);
+          }
         }
-        break;
-      case "color":
-        const colorCode = cmdArgs;
-        if (/^#[0-9A-F]{6}$/i.test(colorCode)) {
-          changeTextColor(colorCode);
-          setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd} ${colorCode}`,
-            `Color changed to ${colorCode}`,
-          ]);
-        } else {
-          setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd} ${colorCode}`,
-            `Invalid color code. if you want to know a hex code, try 'bot ask what is the hex code for [color]', and make sure you put a # at the beginning`,
-          ]);
-        }
-        break;
-
-      // Add more cases for other commands
-      default:
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `> ${cmd}`,
-          `Unknown command: ${cmd}`,
-        ]);
-    }
-  };
-
-  const bookmarks = api.bookmark.list?.useQuery({
-    userId: session.data?.user.id,
-  }).data;
-
-  if (!isContentLoaded) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <ASCIILoadingBar progress={loadingProgress} />
-      </div>
-    );
-  }
-
-  // Render the rest of your interface here
-
-  return (
-    <main
-      style={getTextStyle(textColor)}
-      className={`crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8 ${textColor} `}
-      onClick={handleFocusInput}
-    >
-      <div>
-        <h1>
-          Welcome to Terminal Version 0.1.0 | This is a virtual terminal
-          interface. You can interact with the app by typing commands. For a
-          list of available commands, type `help` and press Enter.
-        </h1>
-        <div className={`output`}>
-          {output.map((line, index) => (
-            <p key={index}>
-              {typeof window !== "undefined" &&
-                localStorage.getItem("lineNumber") === "showLines" && (
-                  <span className="mr-3">{index}</span>
-                )}
-              {line}
-            </p>
-          ))}
-        </div>
-        <div className="row flex">
-          {typeof window !== "undefined" &&
-            localStorage.getItem("lineNumber") === "showLines" && (
-              <span className="mr-3">{output.length}</span>
-            )}
-          <p>&gt;&nbsp;</p>
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            ref={inputRef}
-            onKeyDown={handleInputSubmit}
-            style={getInputStyle(textColor)}
-            className={`w-full bg-neutral-950 outline-none`}
-          />
-        </div>
-      </div>
-    </main>
-  );
-}
+          return (
+            <main
+              style={getTextStyle(textColor)}
+              className={`crt crt-scanlines crt-flicker flex min-h-screen bg-neutral-950 p-8 ${textColor} `}
+              onClick={handleFocusInput}
+            >
+              <div>
+                <h1>
+                  Welcome to Terminal Version 0.1.0 | This is a virtual terminal
+                  interface. You can interact with the app by typing commands.
+                  For a list of available commands, type `help` and press Enter.
+                </h1>
+                <div className={`output`}>
+                  {output.map((line, index) => (
+                    <p key={index}>
+                      {typeof window !== "undefined" &&
+                        localStorage.getItem("lineNumber") === "showLines" && (
+                          <span className="mr-3">{index}</span>
+                        )}
+                      {line}
+                    </p>
+                  ))}
+                </div>
+                <div className="row flex">
+                  {typeof window !== "undefined" &&
+                    localStorage.getItem("lineNumber") === "showLines" && (
+                      <span className="mr-3">{output.length}</span>
+                    )}
+                  <p>&gt;&nbsp;</p>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={handleInputChange}
+                    ref={inputRef}
+                    onKeyDown={handleInputSubmit}
+                    style={getInputStyle(textColor)}
+                    className={`w-full bg-neutral-950 outline-none`}
+                  />
+                </div>
+              </div>
+            </main>
+          );
+        };
+      
