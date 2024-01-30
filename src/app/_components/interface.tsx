@@ -260,6 +260,9 @@ export default function Interface() {
           "  draw       - Generates ASCII art based on a prompt. Usage: draw [prompt]",
           "  search     - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
           "  copylast   - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
+          "  togglelines - Toggles the display of line numbers in the terminal.",
+          "  bm         - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
+          "  color      - Changes the text color of the terminal. Usage: color [hex color code]",
           "",
           "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
         ]);
@@ -602,10 +605,15 @@ export default function Interface() {
           changeTextColor(colorCode);
           setOutput((prevOutput) => [
             ...prevOutput,
-            `> Color changed to ${colorCode}`,
+            `> ${cmd} ${colorCode}`,
+            `Color changed to ${colorCode}`,
           ]);
         } else {
-          setOutput((prevOutput) => [...prevOutput, `> Invalid color code`]);
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} ${colorCode}`,
+            `Invalid color code. if you want to know a hex code, try 'bot ask what is the hex code for [color]', and make sure you put a # at the beginning`,
+          ]);
         }
         break;
 
