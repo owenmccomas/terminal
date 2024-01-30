@@ -20,8 +20,9 @@ const ASCIILoadingBar: React.FC<ASCIILoadingBarProps> = ({ progress }) => {
         height: "100%",
       }}
     >
-      {Array.from({ length: filledBlocks }, () => (
+      {Array.from({ length: filledBlocks }, (_, index) => (
         <span
+          key={index} 
           style={{
             color: amberColor,
             textShadow: `0 0 5px ${amberColor}, 0 0 8px ${amberColor}`,
@@ -30,7 +31,9 @@ const ASCIILoadingBar: React.FC<ASCIILoadingBarProps> = ({ progress }) => {
           █
         </span>
       ))}
-      {Array.from({ length: emptyBlocks }, () => "░").join("")}
+      {Array.from({ length: emptyBlocks }, (_, index) => (
+        <span key={index + filledBlocks}>░</span> 
+      ))}
     </div>
   );
 };

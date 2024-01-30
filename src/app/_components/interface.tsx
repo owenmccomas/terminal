@@ -29,7 +29,7 @@ export default function Interface() {
     // Simulate loading and fetch localStorage content
     const loadingDuration = 1200; // 1.2 seconds
     let interval: number;
-    let timeout: number = setTimeout(() => {
+    const timeout: number = setTimeout(() => {
       interval = setInterval(() => {
         setLoadingProgress((prev) => {
           if (prev >= 100) {
