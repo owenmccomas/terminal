@@ -8,7 +8,7 @@
   font-weight: normal;
   font-style: normal;
 }
-
+/* 
 .glow-amber {
   color: #f59e0b;
   text-shadow:
@@ -21,7 +21,7 @@
   text-shadow:
     0 0 5px #4AF626,
     0 0 8px #4AF626;
-}
+} */
 
 .crt {
   position: relative;
@@ -163,22 +163,6 @@
   100% {
     opacity: 0.2419;
   }
-}
-
-.command-input-amber {
-  width: 100%;
-  background-color: #0a0a0a;
-  border: none;
-  outline: none;
-  color: #f59e0b;
-}
-
-.command-input-green {
-  width: 100%;
-  background-color: #0a0a0a;
-  border: none;
-  outline: none;
-  color: #4AF626;
 }
 
 @keyframes blink {
