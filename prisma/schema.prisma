@@ -55,6 +55,19 @@ model Session {
     user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Macro {
+    id          String   @id @default(cuid())
+    name        String
+    userId      String   // Foreign key referencing User model
+    macros      String[] 
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Relation to User model
+
+    @@unique([userId, macros]) // Ensuring uniqueness for macros array for each user
+}
+
 model User {
     id            String    @id @default(cuid())
     name          String?
@@ -65,8 +78,10 @@ model User {
     sessions      Session[]
     posts         Post[]
     notes         Note[]
-    bookmarks     Bookmark[] // List of bookmarks for the user
+    bookmarks     Bookmark[]
+    macros        Macro[]   // Relation to Macro model
 }
+
 
 model VerificationToken {
     identifier String
