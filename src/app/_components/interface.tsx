@@ -76,7 +76,7 @@ export default function Interface() {
       if (isCreatingNote) {
         processNewNote(input);
       } else {
-        await handleCommand(input);
+        await processCommand(input);
       }
       setInput("");
     }
@@ -356,6 +356,29 @@ export default function Interface() {
       case "view":
         setSelectedNoteTitle(cmdArgs);
         break;
+        case "bot":
+        await handleBotCommand(cmd, args);
+        break;
+      case "draw":
+        await handleDrawCommand(cmd, args);
+        break;
+      case "search":
+        handleSearchCommand(cmd, args);
+        break;
+      case "copylast":
+        await handleCopyLastCommand(cmd, args);
+        break;
+      case "togglelines":
+        handleToggleLinesCommand();
+        break;
+      case "bm":
+        handleBookmarkCommand(cmd, args);
+        break;
+      case "color":
+        handleColorCommand(cmd, args);
+        break;
+      default:
+        handleUnknownCommand(cmd)
     }
   };
 
@@ -631,36 +654,6 @@ export default function Interface() {
     ]);
   };
 
-  const handleCommand = async (cmd: string) => {
-    const args = cmd.split(" ");
-    const command = args[0];
-
-    switch (command) {
-      case "bot":
-        await handleBotCommand(cmd, args);
-        break;
-      case "draw":
-        await handleDrawCommand(cmd, args);
-        break;
-      case "search":
-        handleSearchCommand(cmd, args);
-        break;
-      case "copylast":
-        await handleCopyLastCommand(cmd, args);
-        break;
-      case "togglelines":
-        handleToggleLinesCommand();
-        break;
-      case "bm":
-        handleBookmarkCommand(cmd, args);
-        break;
-      case "color":
-        handleColorCommand(cmd, args);
-        break;
-      default:
-        handleUnknownCommand(cmd);
-    }
-  };
   return (
     <main
       style={getTextStyle(textColor)}
