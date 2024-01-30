@@ -6,8 +6,7 @@ import { signIn } from "next-auth/react";
 
 import { api } from "~/trpc/react";
 
-import ASCIILoadingBar from "../_components/loading-bar";
-import { set } from "zod";
+import BootSequence from "./boot-sequence";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -41,27 +40,23 @@ export default function Interface() {
   }).data;
 
   useEffect(() => {
-    // Simulate loading and fetch localStorage content
-    const loadingDuration = 1200; // 1.2 seconds
-    let interval: number;
-    const timeout: number = setTimeout(() => {
-      interval = setInterval(() => {
-        setLoadingProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            // Here, fetch and set your localStorage content
-            // ...
+    const loadingDuration = 60000; // 60 seconds
+    const ticksPerSecond = 60;
+    const totalTicks = (loadingDuration / 1000) * ticksPerSecond;
+    const incrementPerTick = 100 / totalTicks;
 
-            setIsContentLoaded(true);
-            return 100;
-          }
-          return prev + 5; // Increment progress
-        });
-      }, loadingDuration / 20) as unknown as number; // Divide duration by number of increments
-    }, 0) as unknown as number;
+    const interval: number = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsContentLoaded(true);
+          return 100;
+        }
+        return prev + incrementPerTick;
+      });
+    }, 1000 / ticksPerSecond) as unknown as number;
 
     return () => {
-      clearTimeout(timeout);
       clearInterval(interval);
     };
   }, []);
@@ -207,16 +202,7 @@ export default function Interface() {
   function getTextStyle(color: string) {
     return {
       color: color,
-      textShadow: `0 0 5px ${color}, 0 0 8px ${color}`,
-    };
-  }
-
-  function getInputStyle(color: string) {
-    return {
-      color: color,
-      backgroundColor: "2a2a2a",
-      borderColor: color,
-      textShadow: `0 0 5px ${color}, 0 0 8px ${color}`,
+      textShadow: `0 0 8px ${color}, 0 0 10px ${color}`,
     };
   }
 
@@ -263,25 +249,25 @@ export default function Interface() {
           ...prevOutput,
           `> ${cmd}`,
           "Available commands:",
-          "  help       - Displays this help message.",
-          "  clear      - Clears the terminal output.",
-          "  about      - Shows information about this terminal-like interface.",
-          "  date       - Displays the current date.",
-          "  time       - Displays the current time.",
-          "  echo       - Repeats back the text you enter. Usage: echo [text]",
-          "  signin     - Signs in a user. If already signed in, displays a welcome back message.",
-          "  signout    - Signs out the current user and displays a goodbye message.",
-          "  whoami     - Shows the name of the currently signed in user, or a message if not signed in.",
-          "  newnote    - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
-          "  viewnotes  - Lists titles of all available notes.",
-          "  view       - Selects a note for viewing based on the title. Usage: view [note title]",
-          "  bot        - Interacts with an AI bot. Usage: bot ask [your question]",
-          "  draw       - Generates ASCII art based on a prompt. Usage: draw [prompt]",
-          "  search     - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
-          "  copylast   - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
+          "  help        - Displays this help message.",
+          "  clear       - Clears the terminal output.",
+          "  about       - Shows information about this terminal-like interface.",
+          "  date        - Displays the current date.",
+          "  time        - Displays the current time.",
+          "  echo        - Repeats back the text you enter. Usage: echo [text]",
+          "  signin      - Signs in a user. If already signed in, displays a welcome back message.",
+          "  signout     - Signs out the current user and displays a goodbye message.",
+          "  whoami      - Shows the name of the currently signed in user, or a message if not signed in.",
+          "  newnote     - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
+          "  viewnotes   - Lists titles of all available notes.",
+          "  view        - Selects a note for viewing based on the title. Usage: view [note title]",
+          "  bot         - Interacts with an AI bot. Usage: bot ask [your question]",
+          "  draw        - Generates ASCII art based on a prompt. Usage: draw [prompt]",
+          "  search      - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
+          "  copylast    - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
           "  togglelines - Toggles the display of line numbers in the terminal.",
-          "  bm         - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
-          "  color      - Changes the text color of the terminal. Usage: color [hex color code]",
+          "  bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
+          "  color       - Changes the text color of the terminal. Usage: color [hex color code]",
           "",
           "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
         ]);
@@ -804,7 +790,7 @@ export default function Interface() {
           height: "100vh",
         }}
       >
-        <ASCIILoadingBar progress={loadingProgress} />
+        <BootSequence />
       </div>
     );
   }
@@ -817,19 +803,21 @@ export default function Interface() {
     >
       <div>
         <h1>
-          Welcome to Terminal Version 0.1.0 | This is a virtual terminal
-          interface. You can interact with the app by typing commands. For a
-          list of available commands, type `help` and press Enter.
+          <code className="pre">
+            Welcome to Terminal Version 0.1.0 | This is a virtual terminal
+            interface. You can interact with the app by typing commands. For a
+            list of available commands, type `help` and press Enter.
+          </code>
         </h1>
         <div className={`output`}>
           {output.map((line, index) => (
-            <p key={index}>
+            <pre className="pre" key={index}>
               {typeof window !== "undefined" &&
                 localStorage.getItem("lineNumber") === "showLines" && (
                   <span className="mr-3">{index}</span>
                 )}
               {line}
-            </p>
+            </pre>
           ))}
         </div>
         <div className="row flex">
@@ -837,16 +825,19 @@ export default function Interface() {
             localStorage.getItem("lineNumber") === "showLines" && (
               <span className="mr-3">{output.length}</span>
             )}
-          <p>&gt;&nbsp;</p>
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            ref={inputRef}
-            onKeyDown={handleInputSubmit}
-            style={getInputStyle(textColor)}
-            className={`w-full bg-neutral-950 outline-none`}
-          />
+          <code className="pre">&gt;&nbsp;</code>
+          <pre className="pre">
+            <input
+              type="text"
+              value={input}
+              onChange={handleInputChange}
+              ref={inputRef}
+              onKeyDown={handleInputSubmit}
+              style={getTextStyle(textColor)}
+              className={`crt crt-scanlines crt-flicker w-full bg-neutral-950 outline-none`}
+              autoFocus
+            />
+          </pre>
         </div>
       </div>
     </main>
