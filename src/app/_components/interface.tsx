@@ -654,6 +654,15 @@ export default function Interface() {
     ]);
   };
 
+  if (!isContentLoaded) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+            <ASCIILoadingBar progress={loadingProgress} />
+        </div>
+    );
+}
+
+
   return (
     <main
       style={getTextStyle(textColor)}
