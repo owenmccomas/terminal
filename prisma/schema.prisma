@@ -57,8 +57,9 @@ model Session {
 
 model Macro {
     id          String   @id @default(cuid())
+    name        String
     userId      String   // Foreign key referencing User model
-    macros      Json     // Array of strings stored as JSON
+    macros      String[] 
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 

@@ -23,6 +23,22 @@ export default function Interface() {
   const session = useSession();
   const context = api.useUtils();
 
+  const deleteMacroHandler = api.macro.remove.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  const macroAddHandler = api.macro.add.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  const userMacros = api.macro.list.useQuery({
+    userId: session.data?.user.id,
+  }).data;
+
   useEffect(() => {
     // Simulate loading and fetch localStorage content
     const loadingDuration = 1200; // 1.2 seconds
@@ -356,7 +372,7 @@ export default function Interface() {
       case "view":
         setSelectedNoteTitle(cmdArgs);
         break;
-        case "bot":
+      case "bot":
         await handleBotCommand(cmd, args);
         break;
       case "draw":
@@ -377,8 +393,91 @@ export default function Interface() {
       case "color":
         handleColorCommand(cmd, args);
         break;
+      case "macro":
+        handleMacroCommand(cmd, args);
       default:
-        handleUnknownCommand(cmd)
+        handleUnknownCommand(cmd);
+    }
+  };
+
+  const handleMacroCommand = async (cmd: string, args: string[]) => {
+    const macroArg = args[1] || "default";
+
+    switch (macroArg) {
+      case "-create":
+        const macros = args.slice(2).join(" ").split("-");
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Missing macro name`,
+          ]);
+          break;
+        }
+        if (!args[3]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Missing macro command`,
+          ]);
+          break;
+        }
+
+        macroAddHandler.mutate({
+          name: args[2]?.replace(/^"|"$/g, ""), // Remove quotes
+          macros: macros,
+          userId: session.data?.user.id!,
+        });
+
+        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "macro added"]);
+        break;
+
+      case "-ls":
+        if (userMacros?.length === 0) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `No macros found`,
+          ]);
+        } else {
+          userMacros?.forEach((macro, index) => {
+            setTimeout(() => {
+              setOutput((prevOutput) => [...prevOutput, `> ${macro.name}`]);
+            }, index * 100); // 100 milliseconds delay for each item
+          });
+        }
+        break;
+
+      case "-rm":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Missing macro name`,
+          ]);
+          break;
+        }
+        const macroToRemove = args[2]?.replace(/^"|"$/g, ""); // Remove quotes
+        deleteMacroHandler.mutate({ id: macroToRemove });
+        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "removed"]);
+        break;
+
+      // You can add more subcommands here if needed
+
+      default:
+        // Treat as a macro name to open
+        const macroNameToUse = macroArg.replace(/^"|"$/g, ""); // Remove quotes
+        const macro = userMacros?.find((b) => b.name === macroNameToUse);
+
+        if (macro) {
+          macro.macros.forEach((command, index) => {
+            setTimeout(() => {
+              processCommand(command);
+            }, index * 100); // 100 milliseconds delay for each item
+          });
+        } else {
+          console.log("macro not found");
+        }
     }
   };
 
@@ -627,34 +726,33 @@ export default function Interface() {
   };
 
   const handleColorCommand = (cmd: string, args: string[]) => {
-    const colorArg = args[1] || 'default';
+    const colorArg = args[1] || "default";
 
     // Check if the command is 'color default'
-    if (colorArg === 'default') {
-        changeTextColor('#f59e0b');
-        setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd} ${colorArg}`,
-            `Color changed to default (#f59e0b)`,
-        ]);
-    }
-    else if (/^#[0-9A-F]{6}$/i.test(colorArg)) {
-        // If it's not 'default', then process as normal hex color code
-        changeTextColor(colorArg);
-        setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd} ${colorArg}`,
-            `Color changed to ${colorArg}`,
-        ]);
+    if (colorArg === "default") {
+      changeTextColor("#f59e0b");
+      setOutput((prevOutput) => [
+        ...prevOutput,
+        `> ${cmd} ${colorArg}`,
+        `Color changed to default (#f59e0b)`,
+      ]);
+    } else if (/^#[0-9A-F]{6}$/i.test(colorArg)) {
+      // If it's not 'default', then process as normal hex color code
+      changeTextColor(colorArg);
+      setOutput((prevOutput) => [
+        ...prevOutput,
+        `> ${cmd} ${colorArg}`,
+        `Color changed to ${colorArg}`,
+      ]);
     } else {
-        // Handle invalid color code
-        setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd} ${colorArg}`,
-            `Invalid color code. Try 'color default' for default color or 'color #xxxxxx' for a custom hex code. If you want to know a hexcode try 'bot ask, what is the hex code for [color]'`,
-        ]);
+      // Handle invalid color code
+      setOutput((prevOutput) => [
+        ...prevOutput,
+        `> ${cmd} ${colorArg}`,
+        `Invalid color code. Try 'color default' for default color or 'color #xxxxxx' for a custom hex code. If you want to know a hexcode try 'bot ask, what is the hex code for [color]'`,
+      ]);
     }
-};
+  };
 
   const handleUnknownCommand = (cmd: string) => {
     setOutput((prevOutput) => [
@@ -666,12 +764,18 @@ export default function Interface() {
 
   if (!isContentLoaded) {
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-            <ASCIILoadingBar progress={loadingProgress} />
-        </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <ASCIILoadingBar progress={loadingProgress} />
+      </div>
     );
-}
-
+  }
 
   return (
     <main

@@ -6,10 +6,17 @@ import { db } from "~/server/db";
 export const macrosRouter = createTRPCRouter({
   // Add a new macro
   add: publicProcedure
-    .input(z.object({ userId: z.string(), macros: z.array(z.string()) }))
+    .input(
+      z.object({
+        userId: z.string(),
+        name: z.string(),
+        macros: z.array(z.string()),
+      }),
+    )
     .mutation(async ({ input }) => {
       await db.macro.create({
         data: {
+          name: input.name,
           userId: input.userId,
           macros: input.macros,
         },
