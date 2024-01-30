@@ -834,7 +834,7 @@ export default function Interface() {
               ref={inputRef}
               onKeyDown={handleInputSubmit}
               style={getTextStyle(textColor)}
-              className={`crt crt-scanlines crt-flicker w-full bg-neutral-950 outline-none`}
+              className={`crt crt-scanlines crt-flicker w-[90vw] bg-neutral-950 outline-none`}
               autoFocus
             />
           </pre>
