@@ -365,6 +365,9 @@ export default function Interface() {
       case "draw":
         await handleDrawCommand(cmd, args);
         break;
+      case "open":
+        handleOpenCommand(cmd, args);
+        break;
       case "search":
         handleSearchCommand(cmd, args);
         break;
@@ -382,6 +385,7 @@ export default function Interface() {
         break;
       case "macro":
         handleMacroCommand(cmd, args);
+        break;
       default:
         handleUnknownCommand(cmd);
     }
@@ -392,7 +396,7 @@ export default function Interface() {
 
     switch (macroArg) {
       case "-create":
-        const macros = args.slice(2).join(" ").split("-");
+        const macros = args.slice(3).join(" ").split("-");
         if (!args[2]) {
           setOutput((prevOutput) => [
             ...prevOutput,
@@ -444,8 +448,13 @@ export default function Interface() {
           ]);
           break;
         }
-        const macroToRemove = args[2]?.replace(/^"|"$/g, ""); // Remove quotes
-        deleteMacroHandler.mutate({ id: macroToRemove });
+        const macroToRemove = args[2]?.replace(/^"|"$/g, "");
+        const macroId = userMacros?.find((b) => b.name === macroToRemove)?.id;
+        if (!macroId) {
+          setOutput((prevOutput) => [...prevOutput, `> macro not found`]);
+          break;
+        }
+        deleteMacroHandler.mutate({ id: macroId });
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "removed"]);
         break;
 
@@ -455,11 +464,12 @@ export default function Interface() {
         // Treat as a macro name to open
         const macroNameToUse = macroArg.replace(/^"|"$/g, ""); // Remove quotes
         const macro = userMacros?.find((b) => b.name === macroNameToUse);
+        console.log(macro?.macros);
 
         if (macro) {
           macro.macros.forEach((command, index) => {
             setTimeout(() => {
-              processCommand(command);
+              processCommand(command.trim());
             }, index * 100); // 100 milliseconds delay for each item
           });
         } else {
@@ -551,6 +561,26 @@ export default function Interface() {
     ]);
   };
 
+  const handleOpenCommand = (cmd: string, args: string[]) => {
+    // check if https is included, and if not, automatically add it then open it in a new window
+    if (!args[1]) {
+      setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, `Missing URL`]);
+      return;
+    }
+
+    const urlArg =
+      args[1].includes("https://") || !args[1].includes(".")
+        ? args[1]
+        : `https://${args[1]}`;
+    window.open(urlArg, "_blank");
+
+    setOutput((prevOutput) => [
+      ...prevOutput,
+      `> ${cmd}`,
+      `Opening: ${args[1]}`,
+    ]);
+  };
+
   const handleCopyLastCommand = async (cmd: string, args: string[]) => {
     const cmdArgs = args.slice(1).join(" ");
 
@@ -610,8 +640,7 @@ export default function Interface() {
   };
 
   const handleBookmarkCommand = (cmd: string, args: string[]) => {
-    const command = args[0];
-    if (!command) {
+    if (args.length === 0) {
       setOutput((prevOutput) => [
         ...prevOutput,
         `> ${cmd}`,
@@ -619,12 +648,13 @@ export default function Interface() {
       ]);
       return;
     }
+    const bmSubCmd = args[1];
 
-    const bmArgs = command.split(" ").slice(1); // Get arguments after "bm"
-    const bmSubCmd = bmArgs[0];
+    const bmArgs = args.slice(1); // Get arguments after "bm"
 
     switch (bmSubCmd) {
       case "-add":
+        console.log(bmArgs);
         if (!bmArgs[1]) {
           setOutput((prevOutput) => [
             ...prevOutput,
@@ -692,7 +722,7 @@ export default function Interface() {
 
       default:
         // Treat as a bookmark name to open
-        const bookmarkNameToUse = bmArgs.join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
+        const bookmarkNameToUse = args.slice(1).join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
         const bookmark = bookmarks?.find((b) => b.name === bookmarkNameToUse);
 
         if (bookmark) {
@@ -709,6 +739,7 @@ export default function Interface() {
             `Bookmark '${bookmarkNameToUse}' not found`,
           ]);
         }
+        break;
     }
   };
 
