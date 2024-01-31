@@ -814,7 +814,7 @@ export default function Interface() {
             <pre className="pre" key={index}>
               {typeof window !== "undefined" &&
                 localStorage.getItem("lineNumber") === "showLines" && (
-                  <span className="mr-3">{index}</span>
+                  <span className="mr-3 w-[90vw]">{index}</span>
                 )}
               {line}
             </pre>
@@ -823,7 +823,7 @@ export default function Interface() {
         <div className="row flex">
           {typeof window !== "undefined" &&
             localStorage.getItem("lineNumber") === "showLines" && (
-              <span className="mr-3">{output.length}</span>
+              <span className="mr-3 w-[90vw]">{output.length}</span>
             )}
           <code className="pre">&gt;&nbsp;</code>
           <pre className="pre">
