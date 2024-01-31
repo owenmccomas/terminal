@@ -21,6 +21,7 @@
     "@trpc/next": "^10.43.6",
     "@trpc/react-query": "^10.43.6",
     "@trpc/server": "^10.43.6",
+    "@types/socket.io": "^3.0.2",
     "ai": "^2.2.31",
     "next": "^14.0.4",
     "next-auth": "^4.24.5",
@@ -28,6 +29,8 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "server-only": "^0.0.1",
+    "socket.io": "^4.7.4",
+    "socket.io-client": "^4.7.4",
     "superjson": "^2.2.1",
     "zod": "^3.22.4"
   },

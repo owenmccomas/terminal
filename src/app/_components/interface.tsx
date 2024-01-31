@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
+import { io, Socket } from "socket.io-client";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -22,6 +23,9 @@ export default function Interface() {
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [chatMessages, setChatMessages] = useState<string[]>([]);
+  const [chatInput, setChatInput] = useState("");
 
   const deleteMacroHandler = api.macro.remove.useMutation({
     onSuccess: async () => {
@@ -38,6 +42,36 @@ export default function Interface() {
   const userMacros = api.macro.list.useQuery({
     userId: session.data?.user.id,
   }).data;
+
+  useEffect(() => {
+    // Connect to Socket.IO server
+    const newSocket = io("http://localhost:3000/api/message");
+    setSocket(newSocket as any);
+
+    newSocket.on("roomCreated", (roomName: any) => {
+      // Handle room creation confirmation
+      console.log(`Room created: ${roomName}`);
+    });
+
+    newSocket.on("roomJoined", (roomName: any) => {
+      // Handle joining a room confirmation
+      console.log(`Joined room: ${roomName}`);
+    });
+
+    newSocket.on("newUserJoined", (message: any) => {
+      // Handle new user joining a room
+      console.log(message);
+    });
+
+    socket?.on("chatMessage", (message: string) => {
+      setChatMessages((prevMessages) => [...prevMessages, message]);
+    });
+
+    // Clean up on component unmount
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const loadingDuration = 60000; // 60 seconds
@@ -385,6 +419,13 @@ export default function Interface() {
         break;
       case "macro":
         handleMacroCommand(cmd, args);
+        break;
+      case "createroom":
+        socket?.emit("createRoom", cmdArgs);
+        break;
+
+      case "joinroom":
+        socket?.emit("joinRoom", cmdArgs);
         break;
       default:
         handleUnknownCommand(cmd);
@@ -795,6 +836,19 @@ export default function Interface() {
     );
   }
 
+  const handleChatInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setChatInput(event.target.value);
+  };
+
+  const handleChatSubmit = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && chatInput.trim()) {
+      socket?.emit("chatMessage", chatInput);
+      setChatInput("");
+    }
+  };
+
   return (
     <main
       style={getTextStyle(textColor)}
@@ -840,6 +894,23 @@ export default function Interface() {
           </pre>
         </div>
       </div>
+
+      {socket && (
+        <div className="chat-window">
+          <div className="chat-messages">
+            {chatMessages.map((message, index) => (
+              <div key={index}>{message}</div>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={handleChatInputChange}
+            onKeyDown={handleChatSubmit}
+            placeholder="Type a message..."
+          />
+        </div>
+      )}
     </main>
   );
 }
