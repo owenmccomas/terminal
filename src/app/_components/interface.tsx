@@ -809,14 +809,14 @@ export default function Interface() {
             list of available commands, type `help` and press Enter.
           </code>
         </h1>
-        <div className={`output`}>
+        <div className={`output mr-4 w-[90vw] overflow-x-scroll`}>
           {output.map((line, index) => (
-            <pre className="pre" key={index}>
+            <pre className="pre w- text-wrap" key={index}>
               {typeof window !== "undefined" &&
                 localStorage.getItem("lineNumber") === "showLines" && (
-                  <span className="mr-3 w-[90vw]">{index}</span>
+                  <span className="mr-3">{index}</span>
                 )}
-              {line}
+              <span className="w-[90vw]">{line}</span>
             </pre>
           ))}
         </div>
