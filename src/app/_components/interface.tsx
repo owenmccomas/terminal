@@ -403,11 +403,17 @@ export default function Interface() {
     onSuccess: async () => {
       await context.invalidate();
     },
+    onError: (error) => {
+      setOutput((prevOutput) => [...prevOutput, `Error: ${error.message}`]);
+    },
   });
 
   const updateUsernameHandler = api.username.updateUsername.useMutation({
     onSuccess: async () => {
       await context.invalidate();
+    },
+    onError: (error) => {
+      setOutput((prevOutput) => [...prevOutput, `Error: ${error.message}`]);
     },
   });
 
@@ -427,11 +433,18 @@ export default function Interface() {
     ]);
   };
 
+  // const handleUsername = (userId: string) => {
+  //   return getUsernameHandler.data?.username;
+  // }
+
   const sendMessage = api.message.sendMessage.useMutation({
     onSuccess: async () => {
       await context.invalidate();
     },
   });
+  const usernameQuery = api.username.getUsername.useQuery({
+    userId: session.data?.user.id!,
+  }).data?.username;
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -523,6 +536,7 @@ export default function Interface() {
             ...prevOutput,
             `> ${cmd}`,
             `You are ${session.data?.user.name}`,
+            `Username: ${usernameQuery}`,
           ]);
         } else
           setOutput((prevOutput) => [
@@ -595,24 +609,32 @@ export default function Interface() {
           ]);
         }
         break;
-        case 'whisper': {
-          const [_, username, message] = input.split(/(^\w+\s+)(\w+)\s+(.*)$/).filter(Boolean);
-          if (!username || !message) {
-            setOutput([...output, 'Usage: whisper <username> "<message>"']);
-            break;
-          }
-  
-          sendMessage.mutate({ recipientUsername: username, content: message }, {
+      case "whisper": {
+        const [_, username, message] = input
+          .split(/(^\w+\s+)(\w+)\s+(.*)$/)
+          .filter(Boolean);
+        if (!username || !message) {
+          setOutput([...output, 'Usage: whisper <username> "<message>"']);
+          break;
+        }
+
+        sendMessage.mutate(
+          { recipientUsername: username, content: message },
+          {
             onSuccess: () => {
               setOutput([...output, `Message whispered to ${username}`]);
             },
             onError: (error) => {
-              setOutput([...output, `Error whispering to ${username}: ${error.message}`]);
+              setOutput([
+                ...output,
+                `Error whispering to ${username}: ${error.message}`,
+              ]);
             },
-          });
-  
-          break;
-        }
+          },
+        );
+
+        break;
+      }
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
