@@ -11,6 +11,7 @@ import { useUploadThing } from "../hooks/uploadthing";
 import { File } from "@prisma/client";
 import { create } from "domain";
 import { set } from "zod";
+import { get } from "http";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -427,6 +428,7 @@ export default function Interface() {
       userId: session.data?.user.id!,
       newUsername: newUsername,
     });
+
     setOutput((prevOutput) => [
       ...prevOutput,
       `Username updated to: ${newUsername}`,
@@ -445,6 +447,18 @@ export default function Interface() {
   const usernameQuery = api.username.getUsername.useQuery({
     userId: session.data?.user.id!,
   }).data?.username;
+
+    const getMessages = api.message.getUserMessages.useQuery(
+      session.data?.user.id!,
+    ).data;
+
+  const senderHandler = api.message.findUsernameBySenderId.useQuery(
+    getMessages?.[0]?.senderId ?? "",
+  ).data
+
+    const getSender = (senderId: string) => {
+      return senderHandler;
+    };
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -635,6 +649,19 @@ export default function Interface() {
 
         break;
       }
+      case "messages":
+        if (getMessages) {
+          getMessages.forEach((message) => {
+            const sender = getSender(message.senderId);
+            setOutput([
+              ...output,
+              `From: ${sender} | ${message.content}`,
+            ]);
+          });
+        } else {
+          setOutput([...output, "No messages found"]);
+        }
+        break;
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
