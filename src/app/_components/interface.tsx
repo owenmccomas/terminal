@@ -444,17 +444,17 @@ export default function Interface() {
     userId: session.data?.user.id!,
   }).data?.username;
 
-    const getMessages = api.message.getUserMessages.useQuery(
-      session.data?.user.id!,
-    ).data;
+  const getMessages = api.message.getUserMessages.useQuery(
+    session.data?.user.id!,
+  ).data;
 
   const senderHandler = api.message.findUsernameBySenderId.useQuery(
     getMessages?.[0]?.senderId ?? "",
-  ).data
+  ).data;
 
-    const getSender = (senderId: string) => {
-      return senderHandler;
-    };
+  const getSender = (senderId: string) => {
+    return senderHandler;
+  };
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -486,6 +486,11 @@ export default function Interface() {
           "  togglelines - Toggles the display of line numbers in the terminal.",
           "  bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
           "  color       - Changes the text color of the terminal. Usage: color [hex color code]",
+          "  macro       - Macro management. Subcommands: -create, -ls, -rm. Usage: macro [subcommand] [args]",
+          "  file        - File management. Subcommands: upload, list, grab. Usage: file [subcommand] [args]",
+          "  whisper     - Send a direct message to another user. Usage: whisper <username> '<message>'",
+          "  messages    - View messages sent to you.",
+          "  username    - Manage your username. Subcommands: -create, -edit. Usage: username [subcommand] [args]",
           "",
           "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
         ]);
@@ -515,9 +520,14 @@ export default function Interface() {
           `Current Time: ${new Date().toLocaleTimeString()}`,
         ]);
         break;
-      case "echo":
-        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, cmdArgs]);
-        break;
+        case "echo":
+          const normalizedCmdArgs = cmdArgs.toLowerCase().replace(/[?]/g, "");
+          if (normalizedCmdArgs === "what's it like to hold the hand of someone you love") {
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd} What's it like to hold the hand of someone you love?`, "Interlinked"]);
+          } else {
+            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, cmdArgs]);
+          }
+          break;
       case "signin":
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "Checking..."]);
         if (!session.data) {
@@ -649,15 +659,13 @@ export default function Interface() {
         if (getMessages) {
           getMessages.forEach((message) => {
             const sender = getSender(message.senderId);
-            setOutput([
-              ...output,
-              `From: ${sender} | ${message.content}`,
-            ]);
+            setOutput([...output, `From: ${sender} | ${message.content}`]);
           });
         } else {
           setOutput([...output, "No messages found"]);
         }
         break;
+      
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
