@@ -79,7 +79,8 @@ model User {
     posts         Post[]
     notes         Note[]
     bookmarks     Bookmark[]
-    macros        Macro[] // Relation to Macro model
+    macros        Macro[]   // Relation to Macro model
+    files         File[]    // Relation to File model
     username      String?    @unique
 }
 
@@ -112,5 +113,16 @@ model Bookmark {
     name      String
     userId    String // Foreign key referencing User model
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade) // Relation to User model
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Relation to User model
+}
+
+model File {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    name      String
+    url       String
+    author    String   // Foreign key referencing User model
+
+    user      User     @relation(fields: [author], references: [id], onDelete: Cascade) // Relation to User model
 }
