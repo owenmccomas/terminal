@@ -238,6 +238,14 @@ export default function Interface() {
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
 
+  const createUsername = (username: string) => {
+    // Call the tRPC mutation for creating a username
+  };
+
+  const updateUsername = (newUsername: string) => {
+    // Call the tRPC mutation for updating a username
+  };
+
   const processCommand = async (command: string) => {
     const args = command.split(" ");
     const cmd = args[0]?.toLowerCase() ?? "";
@@ -349,6 +357,38 @@ export default function Interface() {
             ...prevOutput,
             `> ${cmd}`,
             `Title your new note:`,
+          ]);
+        }
+        break;
+      case "username":
+        if (args[1] === "-create") {
+          // Check if args[2] is defined before passing it to createUsername
+          if (args[2]) {
+            createUsername(args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for creation",
+            ]);
+          }
+        } else if (args[1] === "-edit") {
+          // Check if args[2] is defined before passing it to updateUsername
+          if (args[2]) {
+            updateUsername(args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for editing",
+            ]);
+          }
+        } else {
+          // Handle the case where the subcommand is not recognized
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            "Error: Invalid subcommand for 'username'",
           ]);
         }
         break;
