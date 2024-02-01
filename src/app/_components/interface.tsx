@@ -3,11 +3,11 @@ import { useState, useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { signIn } from "next-auth/react";
-import { generateUploader } from "@uploadthing/react";
-
+import { UploadButton } from "./uploadthing";
 import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
+import { useUploadThing } from "../hooks/uploadthing";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -20,6 +20,7 @@ export default function Interface() {
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
   const [textColor, setTextColor] = useState("#f59e0b");
+  const [newFileName, setNewFileName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
@@ -36,9 +37,28 @@ export default function Interface() {
     },
   });
 
+  const newUploadHandler = api.file.upload.useMutation();
+
+  const { startUpload, permittedFileInfo } = useUploadThing("imageUploader", {
+    onClientUploadComplete: () => {
+      setOutput((prevOutput) => [
+        ...prevOutput,
+        `> File uploaded successfully`,
+      ]);
+    },
+    onUploadError: () => {
+      setOutput((prevOutput) => [...prevOutput, `> Error uploading file`]);
+    },
+    onUploadBegin: () => {
+      setOutput((prevOutput) => [...prevOutput, `> Uploading file...`]);
+    },
+  });
+
   const userMacros = api.macro.list.useQuery({
     userId: session.data?.user.id,
   }).data;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadingDuration = 60000; // 60 seconds
@@ -239,8 +259,76 @@ export default function Interface() {
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
 
-  const handleUploadCommand = (cmd: string, args: string[]) => {
+  const uploadFile = async () => {
+    if (fileInputRef.current?.files?.length) {
+      if (!session.data?.user) {
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> file upload`,
+          `You are not signed in`,
+        ]);
+        return;
+      }
+      await startUpload([fileInputRef.current?.files[0]!]);
+      newUploadHandler.mutate({
+        file: {
+          name: newFileName!,
+          url: fileInputRef.current?.files[0]!.name!,
+        },
+        userId: session.data?.user.id!,
+      });
+      setNewFileName(null);
+    }
+  };
+
+  const handleUploadCommand = async (cmd: string, args: string[]) => {
     // we need upload, list, and delete commands.
+
+    switch (args[1]) {
+      case "upload":
+        if (!session.data?.user) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} upload`,
+            `You are not signed in`,
+          ]);
+          break;
+        }
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} upload`,
+            `Missing file name. Usage: file upload [file name]`,
+          ]);
+          break;
+        }
+        setNewFileName(args[2]);
+        triggerFileInputClick();
+        break;
+
+      case "list":
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd} list`,
+          `Listing files...`,
+        ]);
+        break;
+
+      case "delete":
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd} delete`,
+          `Deleting file...`,
+        ]);
+        break;
+
+      default:
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd}`,
+          `Unknown command: ${cmd}`,
+        ]);
+    }
   };
 
   const processCommand = async (command: string) => {
@@ -391,7 +479,7 @@ export default function Interface() {
       case "macro":
         handleMacroCommand(cmd, args);
         break;
-      case "upload":
+      case "file":
         handleUploadCommand(cmd, args);
         break;
       default:
@@ -812,6 +900,10 @@ export default function Interface() {
     );
   }
 
+  const triggerFileInputClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <main
       style={getTextStyle(textColor)}
@@ -857,6 +949,12 @@ export default function Interface() {
           </pre>
         </div>
       </div>
+      <input
+        type="file"
+        style={{ display: "none" }}
+        ref={fileInputRef}
+        onChange={uploadFile}
+      />
     </main>
   );
 }

@@ -1,9 +1,10 @@
+import { url } from "inspector";
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
 
-export const postRouter = createTRPCRouter({
+export const fileRouter = createTRPCRouter({
   getAll: publicProcedure
     .input(
       z.object({
@@ -22,7 +23,7 @@ export const postRouter = createTRPCRouter({
       return files;
     }),
 
-    grab: publicProcedure
+  grab: publicProcedure
     .input(
       z.object({
         fileId: z.string(),
@@ -40,7 +41,7 @@ export const postRouter = createTRPCRouter({
       return file;
     }),
 
-    upload: publicProcedure
+  upload: publicProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -53,9 +54,11 @@ export const postRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const file = await db.file.create({
         data: {
-            name: input.file.name,
-
-        }
-      })
-
+          name: input.file.name,
+          url: input.file.url,
+          author: input.userId,
+        },
+      });
+      return file;
+    }),
 });
