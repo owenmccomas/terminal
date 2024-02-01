@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
+import { getStockPrice } from "utils/stocks";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -352,6 +353,28 @@ export default function Interface() {
           ]);
         }
         break;
+      // Inside processCommand function in Interface.tsx
+      case "stock":
+        const stockData = await getStockPrice(cmdArgs.toUpperCase());
+        if (stockData) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> Stock: ${cmdArgs.toUpperCase()}`,
+            `Date: ${stockData.date}`,
+            `Open: ${stockData.open}`,
+            `High: ${stockData.high}`,
+            `Low: ${stockData.low}`,
+            `Close: ${stockData.close}`,
+            `Volume: ${stockData.volume}`,
+          ]);
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> Error fetching data for ${cmdArgs}`,
+          ]);
+        }
+        break;
+
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
