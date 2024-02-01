@@ -52,7 +52,7 @@ export default function Interface() {
 
   useEffect(() => {}, [grabbedFile.data]);
 
-  const { startUpload } = useUploadThing("imageUploader", {
+  const { startUpload, permittedFileInfo } = useUploadThing("imageUploader", {
     onClientUploadComplete: () => {
       setOutput((prevOutput) => [
         ...prevOutput,
