@@ -481,11 +481,12 @@ export default function Interface() {
           "  view        - Selects a note for viewing based on the title. Usage: view [note title]",
           "  bot         - Interacts with an AI bot. Usage: bot ask [your question]",
           "  draw        - Generates ASCII art based on a prompt. Usage: draw [prompt]",
+          "  open        - Opens a URL in a new tab. Usage: open [URL]",
           "  search      - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
           "  copylast    - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
           "  togglelines - Toggles the display of line numbers in the terminal.",
           "  bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
-          "  color       - Changes the text color of the terminal. Usage: color [hex color code]",
+          "  color       - Changes the text color of the terminal. Usage: color [hex color code] Note: This is stored in localStorage, so it will persist between sessions, but not devices.",
           "  macro       - Macro management. Subcommands: -create, -ls, -rm. Usage: macro [subcommand] [args]",
           "  file        - File management. Subcommands: upload, list, grab. Usage: file [subcommand] [args]",
           "  whisper     - Send a direct message to another user. Usage: whisper <username> '<message>'",
@@ -503,7 +504,9 @@ export default function Interface() {
         setOutput((prevOutput) => [
           ...prevOutput,
           `> ${cmd}`,
-          "This is a terminal-like interface built by Owen McComas.",
+          "This is a terminal-like interface for your life. It is a work in progress. Visit the GitHub repository for more information",
+          "Use command 'copylast' to grab the URL",
+          "https://github.com/owenmccomas/terminal",
         ]);
         break;
       case "date":
