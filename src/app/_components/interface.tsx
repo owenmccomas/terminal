@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { signIn } from "next-auth/react";
+import { generateUploader } from "@uploadthing/react";
 
 import { api } from "~/trpc/react";
 
@@ -105,7 +106,7 @@ export default function Interface() {
       setNoteContent("");
       setIsCreatingNote(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       // Actions to perform on error
       console.error(error);
       setOutput((prevOutput) => [...prevOutput, `> Error saving note`]);
@@ -120,7 +121,7 @@ export default function Interface() {
       console.error("Error fetching notes", notesError);
       return ["Error fetching notes"];
     }
-    return allNotes?.map((note) => note.title) ?? [];
+    return allNotes?.map((note: { title: any }) => note.title) ?? [];
   };
 
   const { data: selectedNote, isLoading: isLoadingSelectedNote } =
@@ -173,7 +174,7 @@ export default function Interface() {
     if (!session.data) throw new Error("User not signed in");
     if (!bookmarks) throw new Error("Bookmarks not loaded");
     const bookmarkId = bookmarks?.find(
-      (bookmark) => bookmark.name === name,
+      (bookmark: { name: string }) => bookmark.name === name,
     )?.id;
     if (!bookmarkId) throw new Error("Bookmark not found");
     deleteBookmarkHandler.mutate({ id: bookmarkId });
@@ -237,6 +238,10 @@ export default function Interface() {
 
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
+
+  const handleUploadCommand = (cmd: string, args: string[]) => {
+    // we need upload, list, and delete commands.
+  };
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -386,6 +391,9 @@ export default function Interface() {
       case "macro":
         handleMacroCommand(cmd, args);
         break;
+      case "upload":
+        handleUploadCommand(cmd, args);
+        break;
       default:
         handleUnknownCommand(cmd);
     }
@@ -431,7 +439,7 @@ export default function Interface() {
             `No macros found`,
           ]);
         } else {
-          userMacros?.forEach((macro, index) => {
+          userMacros?.forEach((macro: { name: any }, index: number) => {
             setTimeout(() => {
               setOutput((prevOutput) => [...prevOutput, `> ${macro.name}`]);
             }, index * 100); // 100 milliseconds delay for each item
@@ -449,7 +457,9 @@ export default function Interface() {
           break;
         }
         const macroToRemove = args[2]?.replace(/^"|"$/g, "");
-        const macroId = userMacros?.find((b) => b.name === macroToRemove)?.id;
+        const macroId = userMacros?.find(
+          (b: { name: string }) => b.name === macroToRemove,
+        )?.id;
         if (!macroId) {
           setOutput((prevOutput) => [...prevOutput, `> macro not found`]);
           break;
@@ -463,11 +473,13 @@ export default function Interface() {
       default:
         // Treat as a macro name to open
         const macroNameToUse = macroArg.replace(/^"|"$/g, ""); // Remove quotes
-        const macro = userMacros?.find((b) => b.name === macroNameToUse);
+        const macro = userMacros?.find(
+          (b: { name: string }) => b.name === macroNameToUse,
+        );
         console.log(macro?.macros);
 
         if (macro) {
-          macro.macros.forEach((command, index) => {
+          macro.macros.forEach((command: string, index: number) => {
             setTimeout(() => {
               processCommand(command.trim());
             }, index * 100); // 100 milliseconds delay for each item
@@ -687,20 +699,23 @@ export default function Interface() {
         } else {
           // Find the length of the longest bookmark name
           const maxLength = bookmarks?.reduce(
-            (max, bookmark) => Math.max(max, bookmark.name.length),
+            (max: number, bookmark: { name: string | any[] }) =>
+              Math.max(max, bookmark.name.length),
             0,
           );
 
           // Add a slight delay between each bookmark
-          bookmarks?.forEach((bookmark, index) => {
-            setTimeout(() => {
-              const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${paddedName} | ${bookmark.url}`,
-              ]);
-            }, index * 100); // 100 milliseconds delay for each item
-          });
+          bookmarks?.forEach(
+            (bookmark: { name: string; url: any }, index: number) => {
+              setTimeout(() => {
+                const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${paddedName} | ${bookmark.url}`,
+                ]);
+              }, index * 100); // 100 milliseconds delay for each item
+            },
+          );
         }
         break;
 
@@ -723,7 +738,9 @@ export default function Interface() {
       default:
         // Treat as a bookmark name to open
         const bookmarkNameToUse = args.slice(1).join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
-        const bookmark = bookmarks?.find((b) => b.name === bookmarkNameToUse);
+        const bookmark = bookmarks?.find(
+          (b: { name: string }) => b.name === bookmarkNameToUse,
+        );
 
         if (bookmark) {
           window.open(bookmark.url, "_blank");
