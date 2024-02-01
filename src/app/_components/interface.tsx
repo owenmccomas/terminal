@@ -435,10 +435,6 @@ export default function Interface() {
     ]);
   };
 
-  // const handleUsername = (userId: string) => {
-  //   return getUsernameHandler.data?.username;
-  // }
-
   const sendMessage = api.message.sendMessage.useMutation({
     onSuccess: async () => {
       await context.invalidate();
