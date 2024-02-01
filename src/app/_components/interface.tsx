@@ -3,10 +3,12 @@ import { useState, useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { signIn } from "next-auth/react";
-
+import { UploadButton } from "./uploadthing";
 import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
+import { useUploadThing } from "../hooks/uploadthing";
+import { File } from "@prisma/client";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -19,6 +21,8 @@ export default function Interface() {
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
   const [textColor, setTextColor] = useState("#f59e0b");
+  const [newFileName, setNewFileName] = useState<string | null>(null);
+  const [fileToGrab, setFileToGrab] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
@@ -35,9 +39,43 @@ export default function Interface() {
     },
   });
 
+  const grabbedFile = api.file.grab.useQuery({ fileId: fileToGrab });
+
+  const { data: files } =
+    api.file.getAll.useQuery({ userId: session.data?.user.id! }) || [];
+
+  const newUploadHandler = api.file.upload.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  useEffect(() => {}, [grabbedFile.data]);
+
+  const { startUpload } = useUploadThing("imageUploader", {
+    onClientUploadComplete: () => {
+      setOutput((prevOutput) => [
+        ...prevOutput,
+        `> File uploaded successfully`,
+      ]);
+    },
+    onUploadError: () => {
+      setOutput((prevOutput) => [...prevOutput, `> Error uploading file`]);
+    },
+    onUploadBegin: () => {
+      setOutput((prevOutput) => [...prevOutput, `> Uploading file...`]);
+    },
+  });
+
   const userMacros = api.macro.list.useQuery({
     userId: session.data?.user.id,
   }).data;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const triggerFileInputClick = () => {
+    fileInputRef.current?.click();
+  };
 
   useEffect(() => {
     const loadingDuration = 60000; // 60 seconds
@@ -81,19 +119,6 @@ export default function Interface() {
     setInput(event.target.value);
   };
 
-  const handleInputSubmit = async (
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (event.key === "Enter") {
-      if (isCreatingNote) {
-        processNewNote(input);
-      } else {
-        await processCommand(input);
-      }
-      setInput("");
-    }
-  };
-
   const createNoteMutation = api.note.createNote.useMutation({
     onSuccess: () => {
       // Actions to perform on successful note creation
@@ -105,7 +130,7 @@ export default function Interface() {
       setNoteContent("");
       setIsCreatingNote(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       // Actions to perform on error
       console.error(error);
       setOutput((prevOutput) => [...prevOutput, `> Error saving note`]);
@@ -120,7 +145,7 @@ export default function Interface() {
       console.error("Error fetching notes", notesError);
       return ["Error fetching notes"];
     }
-    return allNotes?.map((note) => note.title) ?? [];
+    return allNotes?.map((note: { title: any }) => note.title) ?? [];
   };
 
   const { data: selectedNote, isLoading: isLoadingSelectedNote } =
@@ -173,7 +198,7 @@ export default function Interface() {
     if (!session.data) throw new Error("User not signed in");
     if (!bookmarks) throw new Error("Bookmarks not loaded");
     const bookmarkId = bookmarks?.find(
-      (bookmark) => bookmark.name === name,
+      (bookmark: { name: string }) => bookmark.name === name,
     )?.id;
     if (!bookmarkId) throw new Error("Bookmark not found");
     deleteBookmarkHandler.mutate({ id: bookmarkId });
@@ -220,6 +245,12 @@ export default function Interface() {
   }, []);
 
   useEffect(() => {
+    if (fileToGrab) {
+      grabbedFile.refetch();
+    }
+  }, [fileToGrab]);
+
+  useEffect(() => {
     const totalTime = 1200; // Total time for loading in milliseconds (1.2 seconds)
     const intervalTime = 10; // Interval time in milliseconds
     const increment = (100 * intervalTime) / totalTime; // Increment per interval
@@ -237,6 +268,142 @@ export default function Interface() {
 
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
+
+  const uploadFile = async () => {
+    if (fileInputRef.current?.files?.length) {
+      if (!session.data?.user) {
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> file upload`,
+          `You are not signed in`,
+        ]);
+        return;
+      }
+      const file = await startUpload([fileInputRef.current?.files[0]!]);
+      if (!file || !file[0]) {
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> file upload`,
+          `Error uploading file`,
+        ]);
+        return;
+      }
+      newUploadHandler.mutate({
+        file: {
+          name: newFileName!,
+          url: file[0].url,
+        },
+        userId: session.data?.user.id!,
+      });
+      setNewFileName(null);
+    }
+  };
+
+  const handleUploadCommand = async (cmd: string, args: string[]) => {
+    // we need upload, list, and delete commands.
+
+    switch (args[1]) {
+      case "upload":
+        if (!session.data?.user) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} upload`,
+            `You are not signed in`,
+          ]);
+          break;
+        }
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} upload`,
+            `Missing file name. Usage: file upload [file name]`,
+          ]);
+          break;
+        }
+        setNewFileName(args[2]);
+        triggerFileInputClick();
+        break;
+
+      case "list":
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd} list`,
+          `Listing files...`,
+        ]);
+
+        if (files?.length) {
+          files.forEach((file: { name: string; url: string; id: string }) => {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${file.name} | filetype: ${file.url.split(".").pop()} | fileId: ${file.id} |`,
+            ]);
+          });
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} list`,
+            `No files found`,
+          ]);
+        }
+        break;
+
+      case "grab":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} grab`,
+            `Missing file id. Usage: file grab [file id]`,
+          ]);
+          break;
+        }
+        setFileToGrab(args[2]);
+        const file = await grabbedFile.refetch();
+        if (file.data.url) {
+          window.open(file.data.url, "_blank");
+        }
+        break;
+
+      case "getid":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `Missing file name. Usage: file getid [file name]`,
+          ]);
+          break;
+        }
+        const fileToGetId = files?.find((file: File) => file.name === args[2]);
+        if (fileToGetId) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `${fileToGetId.id}`,
+          ]);
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `File not found`,
+          ]);
+        }
+        break;
+
+      default:
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd}`,
+          `Unknown command: ${cmd}`,
+        ]);
+    }
+  };
+
+  const createUsername = (username: string) => {
+    // Call the tRPC mutation for creating a username
+  };
+
+  const updateUsername = (newUsername: string) => {
+    // Call the tRPC mutation for updating a username
+  };
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -352,6 +519,38 @@ export default function Interface() {
           ]);
         }
         break;
+      case "username":
+        if (args[1] === "-create") {
+          // Check if args[2] is defined before passing it to createUsername
+          if (args[2]) {
+            createUsername(args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for creation",
+            ]);
+          }
+        } else if (args[1] === "-edit") {
+          // Check if args[2] is defined before passing it to updateUsername
+          if (args[2]) {
+            updateUsername(args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for editing",
+            ]);
+          }
+        } else {
+          // Handle the case where the subcommand is not recognized
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            "Error: Invalid subcommand for 'username'",
+          ]);
+        }
+        break;
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
@@ -385,6 +584,9 @@ export default function Interface() {
         break;
       case "macro":
         handleMacroCommand(cmd, args);
+        break;
+      case "file":
+        handleUploadCommand(cmd, args);
         break;
       default:
         handleUnknownCommand(cmd);
@@ -431,7 +633,7 @@ export default function Interface() {
             `No macros found`,
           ]);
         } else {
-          userMacros?.forEach((macro, index) => {
+          userMacros?.forEach((macro: { name: any }, index: number) => {
             setTimeout(() => {
               setOutput((prevOutput) => [...prevOutput, `> ${macro.name}`]);
             }, index * 100); // 100 milliseconds delay for each item
@@ -449,7 +651,9 @@ export default function Interface() {
           break;
         }
         const macroToRemove = args[2]?.replace(/^"|"$/g, "");
-        const macroId = userMacros?.find((b) => b.name === macroToRemove)?.id;
+        const macroId = userMacros?.find(
+          (b: { name: string }) => b.name === macroToRemove,
+        )?.id;
         if (!macroId) {
           setOutput((prevOutput) => [...prevOutput, `> macro not found`]);
           break;
@@ -463,11 +667,13 @@ export default function Interface() {
       default:
         // Treat as a macro name to open
         const macroNameToUse = macroArg.replace(/^"|"$/g, ""); // Remove quotes
-        const macro = userMacros?.find((b) => b.name === macroNameToUse);
+        const macro = userMacros?.find(
+          (b: { name: string }) => b.name === macroNameToUse,
+        );
         console.log(macro?.macros);
 
         if (macro) {
-          macro.macros.forEach((command, index) => {
+          macro.macros.forEach((command: string, index: number) => {
             setTimeout(() => {
               processCommand(command.trim());
             }, index * 100); // 100 milliseconds delay for each item
@@ -559,6 +765,19 @@ export default function Interface() {
       `> ${cmd}`,
       `Searching: ${searchQuery}`,
     ]);
+  };
+
+  const handleInputSubmit = async (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === "Enter") {
+      if (isCreatingNote) {
+        processNewNote(input);
+      } else {
+        await processCommand(input);
+      }
+      setInput("");
+    }
   };
 
   const handleOpenCommand = (cmd: string, args: string[]) => {
@@ -687,20 +906,23 @@ export default function Interface() {
         } else {
           // Find the length of the longest bookmark name
           const maxLength = bookmarks?.reduce(
-            (max, bookmark) => Math.max(max, bookmark.name.length),
+            (max: number, bookmark: { name: string | any[] }) =>
+              Math.max(max, bookmark.name.length),
             0,
           );
 
           // Add a slight delay between each bookmark
-          bookmarks?.forEach((bookmark, index) => {
-            setTimeout(() => {
-              const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${paddedName} | ${bookmark.url}`,
-              ]);
-            }, index * 100); // 100 milliseconds delay for each item
-          });
+          bookmarks?.forEach(
+            (bookmark: { name: string; url: any }, index: number) => {
+              setTimeout(() => {
+                const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${paddedName} | ${bookmark.url}`,
+                ]);
+              }, index * 100); // 100 milliseconds delay for each item
+            },
+          );
         }
         break;
 
@@ -723,7 +945,9 @@ export default function Interface() {
       default:
         // Treat as a bookmark name to open
         const bookmarkNameToUse = args.slice(1).join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
-        const bookmark = bookmarks?.find((b) => b.name === bookmarkNameToUse);
+        const bookmark = bookmarks?.find(
+          (b: { name: string }) => b.name === bookmarkNameToUse,
+        );
 
         if (bookmark) {
           window.open(bookmark.url, "_blank");
@@ -840,6 +1064,12 @@ export default function Interface() {
           </pre>
         </div>
       </div>
+      <input
+        type="file"
+        style={{ display: "none" }}
+        ref={fileInputRef}
+        onChange={uploadFile}
+      />
     </main>
   );
 }
