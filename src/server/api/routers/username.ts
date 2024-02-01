@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
 
-export const userRouter = createTRPCRouter({
+export const usernameRouter = createTRPCRouter({
   createUsername: publicProcedure
     .input(z.object({ userId: z.string(), username: z.string().min(1) }))
     .mutation(async ({ input }) => {

@@ -238,12 +238,37 @@ export default function Interface() {
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
 
-  const createUsername = (username: string) => {
-    // Call the tRPC mutation for creating a username
+  const usernameCreate = api.username.createUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+  const usernameUpdate = api.username.updateUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  const createUsername = (userId: string, username: string) => {
+    try {
+      usernameCreate.mutate({ userId, username });
+      // Optionally handle success
+      setOutput((prevOutput) => [...prevOutput, "Username created successfully"]);
+    } catch (error) {
+      // Handle error
+      setOutput((prevOutput) => [...prevOutput, "Error creating username"]);
+    }
   };
 
-  const updateUsername = (newUsername: string) => {
-    // Call the tRPC mutation for updating a username
+  const updateUsername = (userId: string, newUsername: string) => {
+    try {
+      usernameUpdate.mutate({ userId, newUsername });
+      // Optionally handle success
+      setOutput((prevOutput) => [...prevOutput, "Username updated successfully"]);
+    } catch (error) {
+      // Handle error
+      setOutput((prevOutput) => [...prevOutput, "Error updating username"]);
+    }
   };
 
   const processCommand = async (command: string) => {
@@ -362,25 +387,41 @@ export default function Interface() {
         break;
       case "username":
         if (args[1] === "-create") {
-          // Check if args[2] is defined before passing it to createUsername
-          if (args[2]) {
-            createUsername(args[2]);
-          } else {
+          if (!args[2]) {
             setOutput((prevOutput) => [
               ...prevOutput,
               `> ${cmd}`,
               "Error: Missing username for creation",
             ]);
+            return;
           }
-        } else if (args[1] === "-edit") {
-          // Check if args[2] is defined before passing it to updateUsername
-          if (args[2]) {
-            updateUsername(args[2]);
+          // Check if user id is defined before passing it to createUsername
+          if (session.data?.user?.id) {
+            createUsername(session.data.user.id, args[2]);
           } else {
             setOutput((prevOutput) => [
               ...prevOutput,
               `> ${cmd}`,
-              "Error: Missing username for editing",
+              "Error: Missing user id for creation",
+            ]);
+          }
+        } else if (args[1] === "-edit") {
+          if (!args[2]) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for creation",
+            ]);
+            return;
+          }
+          // Check if user id is defined before passing it to updateUsername
+          if (session.data?.user?.id) {
+            updateUsername(session.data.user.id, args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing user id for editing",
             ]);
           }
         } else {
