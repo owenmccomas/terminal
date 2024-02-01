@@ -26,10 +26,11 @@ export const fileRouter = createTRPCRouter({
   grab: publicProcedure
     .input(
       z.object({
-        fileId: z.string(),
+        fileId: z.string().optional(),
       }),
     )
     .query(async ({ input }) => {
+      if (!input?.fileId) return {} as any;
       const file = await db.file.findUnique({
         where: {
           id: input.fileId,

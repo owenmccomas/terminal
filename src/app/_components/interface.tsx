@@ -8,6 +8,7 @@ import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
 import { useUploadThing } from "../hooks/uploadthing";
+import { File } from "@prisma/client";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -21,6 +22,7 @@ export default function Interface() {
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
   const [textColor, setTextColor] = useState("#f59e0b");
   const [newFileName, setNewFileName] = useState<string | null>(null);
+  const [fileToGrab, setFileToGrab] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
@@ -37,9 +39,20 @@ export default function Interface() {
     },
   });
 
-  const newUploadHandler = api.file.upload.useMutation();
+  const grabbedFile = api.file.grab.useQuery({ fileId: fileToGrab });
 
-  const { startUpload, permittedFileInfo } = useUploadThing("imageUploader", {
+  const { data: files } =
+    api.file.getAll.useQuery({ userId: session.data?.user.id! }) || [];
+
+  const newUploadHandler = api.file.upload.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  useEffect(() => {}, [grabbedFile.data]);
+
+  const { startUpload } = useUploadThing("imageUploader", {
     onClientUploadComplete: () => {
       setOutput((prevOutput) => [
         ...prevOutput,
@@ -232,6 +245,12 @@ export default function Interface() {
   }, []);
 
   useEffect(() => {
+    if (fileToGrab) {
+      grabbedFile.refetch();
+    }
+  }, [fileToGrab]);
+
+  useEffect(() => {
     const totalTime = 1200; // Total time for loading in milliseconds (1.2 seconds)
     const intervalTime = 10; // Interval time in milliseconds
     const increment = (100 * intervalTime) / totalTime; // Increment per interval
@@ -260,11 +279,19 @@ export default function Interface() {
         ]);
         return;
       }
-      await startUpload([fileInputRef.current?.files[0]!]);
+      const file = await startUpload([fileInputRef.current?.files[0]!]);
+      if (!file || !file[0]) {
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> file upload`,
+          `Error uploading file`,
+        ]);
+        return;
+      }
       newUploadHandler.mutate({
         file: {
           name: newFileName!,
-          url: fileInputRef.current?.files[0]!.name!,
+          url: file[0].url,
         },
         userId: session.data?.user.id!,
       });
@@ -303,14 +330,62 @@ export default function Interface() {
           `> ${cmd} list`,
           `Listing files...`,
         ]);
+
+        if (files?.length) {
+          files.forEach((file: { name: string; url: string; id: string }) => {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${file.name} | filetype: ${file.url.split(".").pop()} | fileId: ${file.id} |`,
+            ]);
+          });
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} list`,
+            `No files found`,
+          ]);
+        }
         break;
 
-      case "delete":
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `> ${cmd} delete`,
-          `Deleting file...`,
-        ]);
+      case "grab":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} grab`,
+            `Missing file id. Usage: file grab [file id]`,
+          ]);
+          break;
+        }
+        setFileToGrab(args[2]);
+        const file = await grabbedFile.refetch();
+        if (file.data.url) {
+          window.open(file.data.url, "_blank");
+        }
+        break;
+
+      case "getid":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `Missing file name. Usage: file getid [file name]`,
+          ]);
+          break;
+        }
+        const fileToGetId = files?.find((file: File) => file.name === args[2]);
+        if (fileToGetId) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `${fileToGetId.id}`,
+          ]);
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `File not found`,
+          ]);
+        }
         break;
 
       default:
