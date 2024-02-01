@@ -9,6 +9,8 @@ import { api } from "~/trpc/react";
 import BootSequence from "./boot-sequence";
 import { useUploadThing } from "../hooks/uploadthing";
 import { File } from "@prisma/client";
+import { create } from "domain";
+import { set } from "zod";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -397,13 +399,39 @@ export default function Interface() {
     }
   };
 
-  const createUsername = (username: string) => {
-    // Call the tRPC mutation for creating a username
+  const createUsernameHander = api.username.createUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  const updateUsernameHandler = api.username.updateUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  const createUsername = (userId: string, username: string) => {
+    createUsernameHander.mutate({ userId: session.data?.user.id!, username });
+    setOutput((prevOutput) => [...prevOutput, `Username created: ${username}`]);
   };
 
-  const updateUsername = (newUsername: string) => {
-    // Call the tRPC mutation for updating a username
+  const updateUsername = (userId: string, newUsername: string) => {
+    updateUsernameHandler.mutate({
+      userId: session.data?.user.id!,
+      newUsername: newUsername,
+    });
+    setOutput((prevOutput) => [
+      ...prevOutput,
+      `Username updated to: ${newUsername}`,
+    ]);
   };
+
+  const sendMessage = api.message.sendMessage.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -567,6 +595,24 @@ export default function Interface() {
           ]);
         }
         break;
+        case 'whisper': {
+          const [_, username, message] = input.split(/(^\w+\s+)(\w+)\s+(.*)$/).filter(Boolean);
+          if (!username || !message) {
+            setOutput([...output, 'Usage: whisper <username> "<message>"']);
+            break;
+          }
+  
+          sendMessage.mutate({ recipientUsername: username, content: message }, {
+            onSuccess: () => {
+              setOutput([...output, `Message whispered to ${username}`]);
+            },
+            onError: (error) => {
+              setOutput([...output, `Error whispering to ${username}: ${error.message}`]);
+            },
+          });
+  
+          break;
+        }
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
