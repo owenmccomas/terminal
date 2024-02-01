@@ -69,20 +69,38 @@ model Macro {
 }
 
 model User {
-    id            String     @id @default(cuid())
-    name          String?
-    email         String?    @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
-    notes         Note[]
-    bookmarks     Bookmark[]
-    macros        Macro[]   // Relation to Macro model
-    files         File[]    // Relation to File model
-    username      String?    @unique
+    id               String     @id @default(cuid())
+    name             String?
+    email            String?    @unique
+    emailVerified    DateTime?
+    image            String?
+    accounts         Account[]
+    sessions         Session[]
+    posts            Post[]
+    notes            Note[]
+    bookmarks        Bookmark[]
+    macros           Macro[] 
+    files            File[] 
+    username         String?    @unique
+    sentMessages     Message[]  @relation(name: "MessageSender")
+    receivedMessages Message[]  @relation(name: "MessageRecipient")
 }
+
+model Message {
+  id          Int      @id @default(autoincrement())
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  senderId    String   
+  recipientId String   
+  readStatus  Boolean  @default(false)
+
+  sender      User     @relation(name: "MessageSender", fields: [senderId], references: [id])
+  recipient   User     @relation(name: "MessageRecipient", fields: [recipientId], references: [id])
+
+  @@index([senderId, recipientId])
+}
+
 
 model VerificationToken {
     identifier String
@@ -113,7 +131,7 @@ model Bookmark {
     name      String
     userId    String // Foreign key referencing User model
 
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Relation to User model
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade) // Relation to User model
 }
 
 model File {
@@ -122,7 +140,7 @@ model File {
     updatedAt DateTime @updatedAt
     name      String
     url       String
-    author    String   // Foreign key referencing User model
+    author    String // Foreign key referencing User model
 
-    user      User     @relation(fields: [author], references: [id], onDelete: Cascade) // Relation to User model
+    user User @relation(fields: [author], references: [id], onDelete: Cascade) // Relation to User model
 }

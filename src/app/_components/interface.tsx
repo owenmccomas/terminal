@@ -9,6 +9,8 @@ import { api } from "~/trpc/react";
 import BootSequence from "./boot-sequence";
 import { useUploadThing } from "../hooks/uploadthing";
 import { File } from "@prisma/client";
+import { create } from "domain";
+import { set } from "zod";
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -397,13 +399,52 @@ export default function Interface() {
     }
   };
 
-  const createUsername = (username: string) => {
-    // Call the tRPC mutation for creating a username
+  const createUsernameHander = api.username.createUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+    onError: (error) => {
+      setOutput((prevOutput) => [...prevOutput, `Error: ${error.message}`]);
+    },
+  });
+
+  const updateUsernameHandler = api.username.updateUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+    onError: (error) => {
+      setOutput((prevOutput) => [...prevOutput, `Error: ${error.message}`]);
+    },
+  });
+
+  const createUsername = (userId: string, username: string) => {
+    createUsernameHander.mutate({ userId: session.data?.user.id!, username });
+    setOutput((prevOutput) => [...prevOutput, `Username created: ${username}`]);
   };
 
-  const updateUsername = (newUsername: string) => {
-    // Call the tRPC mutation for updating a username
+  const updateUsername = (userId: string, newUsername: string) => {
+    updateUsernameHandler.mutate({
+      userId: session.data?.user.id!,
+      newUsername: newUsername,
+    });
+    setOutput((prevOutput) => [
+      ...prevOutput,
+      `Username updated to: ${newUsername}`,
+    ]);
   };
+
+  // const handleUsername = (userId: string) => {
+  //   return getUsernameHandler.data?.username;
+  // }
+
+  const sendMessage = api.message.sendMessage.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+  const usernameQuery = api.username.getUsername.useQuery({
+    userId: session.data?.user.id!,
+  }).data?.username;
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -495,6 +536,7 @@ export default function Interface() {
             ...prevOutput,
             `> ${cmd}`,
             `You are ${session.data?.user.name}`,
+            `Username: ${usernameQuery}`,
           ]);
         } else
           setOutput((prevOutput) => [
@@ -521,25 +563,41 @@ export default function Interface() {
         break;
       case "username":
         if (args[1] === "-create") {
-          // Check if args[2] is defined before passing it to createUsername
-          if (args[2]) {
-            createUsername(args[2]);
-          } else {
+          if (!args[2]) {
             setOutput((prevOutput) => [
               ...prevOutput,
               `> ${cmd}`,
               "Error: Missing username for creation",
             ]);
+            return;
           }
-        } else if (args[1] === "-edit") {
-          // Check if args[2] is defined before passing it to updateUsername
-          if (args[2]) {
-            updateUsername(args[2]);
+          // Check if user id is defined before passing it to createUsername
+          if (session.data?.user?.id) {
+            createUsername(session.data.user.id, args[2]);
           } else {
             setOutput((prevOutput) => [
               ...prevOutput,
               `> ${cmd}`,
-              "Error: Missing username for editing",
+              "Error: Missing user id for creation",
+            ]);
+          }
+        } else if (args[1] === "-edit") {
+          if (!args[2]) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for creation",
+            ]);
+            return;
+          }
+          // Check if user id is defined before passing it to updateUsername
+          if (session.data?.user?.id) {
+            updateUsername(session.data.user.id, args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing user id for editing",
             ]);
           }
         } else {
@@ -551,6 +609,32 @@ export default function Interface() {
           ]);
         }
         break;
+      case "whisper": {
+        const [_, username, message] = input
+          .split(/(^\w+\s+)(\w+)\s+(.*)$/)
+          .filter(Boolean);
+        if (!username || !message) {
+          setOutput([...output, 'Usage: whisper <username> "<message>"']);
+          break;
+        }
+
+        sendMessage.mutate(
+          { recipientUsername: username, content: message },
+          {
+            onSuccess: () => {
+              setOutput([...output, `Message whispered to ${username}`]);
+            },
+            onError: (error) => {
+              setOutput([
+                ...output,
+                `Error whispering to ${username}: ${error.message}`,
+              ]);
+            },
+          },
+        );
+
+        break;
+      }
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
