@@ -13,9 +13,8 @@ const BootSequence: React.FC = () => {
       "Booting... OK",
       "----------------------------------------",
       "Allocating Memory Resources... 512MB OK",
-      "Establishing Network Interfaces... 3 Detected",
       "Loading Extension Modules... 6 Loaded",
-      "Calibrating Display Settings... 1920x1080 Set",
+      "Calibrating Display Settings... Set",
       "Checking Disk Space... 120GB Free",
       "Updating Local Data Cache... 245 Items Updated",
       "Testing Audio Output... Stereo OK",
@@ -31,8 +30,10 @@ const BootSequence: React.FC = () => {
       "Activating Voice Commands... Voice Recognition Active",
       "Running Diagnostic Tests... All Systems Functional",
       "----------------------------------------",
+      "Making up more random messages... OK",
       "Initializing Core Modules... OK",
       "Establishing Data Connections... OK",
+      "Drinking Caffeine... OK",
       "Setting Up User Interface... OK",
       "Verifying Security Protocols... OK",
       "Synchronizing Time and Date... OK",
@@ -45,7 +46,6 @@ const BootSequence: React.FC = () => {
       "Loading User Preferences... OK",
       "Checking for Updates... OK",
       "Finalizing Setup... OK",
-      // Add more lines or generate them dynamically as needed
     ];
 
     const interval = setInterval(() => {
