@@ -7,11 +7,15 @@ import { UploadButton } from "./uploadthing";
 import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
+
+import { getStockPrice } from "utils/stocks";
+
 import { useUploadThing } from "../hooks/uploadthing";
 import { File } from "@prisma/client";
 import { create } from "domain";
 import { set } from "zod";
 import { get } from "http";
+
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -591,6 +595,30 @@ export default function Interface() {
           ]);
         }
         break;
+
+      // Inside processCommand function in Interface.tsx
+      case "stock":
+        const stockData = await getStockPrice(cmdArgs.toUpperCase());
+        if (stockData) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> Stock: ${cmdArgs.toUpperCase()}`,
+            `Date: ${stockData.date}`,
+            `Open: ${stockData.open}`,
+            `High: ${stockData.high}`,
+            `Low: ${stockData.low}`,
+            `Close: ${stockData.close}`,
+            `Volume: ${stockData.volume}`,
+          ]);
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> Error fetching data for ${cmdArgs}`,
+          ]);
+        }
+        break;
+
+
       case "username":
         if (args[1] === "-create") {
           if (!args[2]) {
@@ -718,6 +746,7 @@ export default function Interface() {
           ]);
         }
         break;
+
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
