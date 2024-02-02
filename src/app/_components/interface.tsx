@@ -227,12 +227,12 @@ export default function Interface() {
     }
   }
 
-  function getTextStyle(color: string) {
+  const getTextStyle = (color: string) => {
     return {
       color: color,
       textShadow: `0 0 8px ${color}, 0 0 10px ${color}`,
     };
-  }
+  };
 
   const changeTextColor = (color: string) => {
     setTextColor(color);
@@ -452,9 +452,11 @@ export default function Interface() {
     getMessages?.[0]?.senderId ?? "",
   ).data;
 
-  const getSender = (senderId: string) => {
-    return senderHandler;
-  };
+  const messageDeleteHandler = api.message.deleteMessage.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
 
   const processCommand = async (command: string) => {
     const args = command.split(" ");
@@ -463,38 +465,40 @@ export default function Interface() {
 
     switch (cmd) {
       case "help":
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `> ${cmd}`,
-          "Available commands:",
-          "  help        - Displays this help message.",
-          "  clear       - Clears the terminal output.",
-          "  about       - Shows information about this terminal-like interface.",
-          "  date        - Displays the current date.",
-          "  time        - Displays the current time.",
-          "  echo        - Repeats back the text you enter. Usage: echo [text]",
-          "  signin      - Signs in a user. If already signed in, displays a welcome back message.",
-          "  signout     - Signs out the current user and displays a goodbye message.",
-          "  whoami      - Shows the name of the currently signed in user, or a message if not signed in.",
-          "  newnote     - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
-          "  viewnotes   - Lists titles of all available notes.",
-          "  view        - Selects a note for viewing based on the title. Usage: view [note title]",
-          "  bot         - Interacts with an AI bot. Usage: bot ask [your question]",
-          "  draw        - Generates ASCII art based on a prompt. Usage: draw [prompt]",
-          "  open        - Opens a URL in a new tab. Usage: open [URL]",
-          "  search      - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
-          "  copylast    - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
-          "  togglelines - Toggles the display of line numbers in the terminal.",
-          "  bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
-          "  color       - Changes the text color of the terminal. Usage: color [hex color code] Note: This is stored in localStorage, so it will persist between sessions, but not devices.",
-          "  macro       - Macro management. Subcommands: -create, -ls, -rm. Usage: macro [subcommand] [args]",
-          "  file        - File management. Subcommands: upload, list, grab. Usage: file [subcommand] [args]",
-          "  whisper     - Send a direct message to another user. Usage: whisper <username> '<message>'",
-          "  messages    - View messages sent to you.",
-          "  username    - Manage your username. Subcommands: -create, -edit. Usage: username [subcommand] [args]",
-          "",
-          "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
-        ]);
+        const helpCommands = [
+          "Commands:",
+          "about       - Shows information about this terminal-like interface.",
+          "bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
+          "bot         - Interacts with an AI bot. Usage: bot ask [your question]",
+          "clear       - Clears the terminal output.",
+          "color       - Changes the text color of the terminal. Usage: color [hex color code] Note: This is stored in localStorage, so it will persist between sessions, but not devices.",
+          "copylast    - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
+          "date        - Displays the current date.",
+          "draw        - Generates ASCII art based on a prompt. Usage: draw [prompt]",
+          "echo        - Repeats back the text you enter. Usage: echo [text]",
+          "file        - File management. Subcommands: upload, list, grab. Usage: file [subcommand] [args]",
+          "help        - Displays this help message.",
+          "macro       - Macro management. Subcommands: -create, -ls, -rm. Usage: macro [subcommand] [args]",
+          "messages    - View messages sent to you.",
+          "newnote     - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
+          "open        - Opens a URL in a new tab. Usage: open [URL]",
+          "search      - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
+          "signin      - Signs in a user. If already signed in, displays a welcome back message.",
+          "signout     - Signs out the current user and displays a goodbye message.",
+          "time        - Displays the current time.",
+          "togglelines - Toggles the display of line numbers in the terminal.",
+          "username    - Manage your username. Subcommands: -create, -edit. Usage: username [subcommand] [args]",
+          "view        - Selects a note for viewing based on the title. Usage: view [note title]",
+          "viewnotes   - Lists titles of all available notes.",
+          "whisper     - Send a direct message to another user. Usage: whisper <username> '<message>'",
+          "whoami      - Shows the name and username of the currently signed in user, or a message if not signed in.",
+        ];
+
+        helpCommands.forEach((command, index) => {
+          setTimeout(() => {
+            setOutput((prevOutput) => [...prevOutput, `${command}`]);
+          }, index * 37);
+        });
         break;
 
       case "clear":
@@ -523,14 +527,21 @@ export default function Interface() {
           `Current Time: ${new Date().toLocaleTimeString()}`,
         ]);
         break;
-        case "echo":
-          const normalizedCmdArgs = cmdArgs.toLowerCase().replace(/[?]/g, "");
-          if (normalizedCmdArgs === "what's it like to hold the hand of someone you love") {
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd} What's it like to hold the hand of someone you love?`, "Interlinked"]);
-          } else {
-            setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, cmdArgs]);
-          }
-          break;
+      case "echo":
+        const normalizedCmdArgs = cmdArgs.toLowerCase().replace(/[?]/g, "");
+        if (
+          normalizedCmdArgs ===
+          "what's it like to hold the hand of someone you love"
+        ) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} What's it like to hold the hand of someone you love?`,
+            "Interlinked",
+          ]);
+        } else {
+          setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, cmdArgs]);
+        }
+        break;
       case "signin":
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "Checking..."]);
         if (!session.data) {
@@ -632,6 +643,7 @@ export default function Interface() {
           ]);
         }
         break;
+
       case "whisper": {
         const [_, username, message] = input
           .split(/(^\w+\s+)(\w+)\s+(.*)$/)
@@ -641,13 +653,18 @@ export default function Interface() {
           break;
         }
 
+        // Add "sending..." message before initiating the send operation
+        setOutput([...output, `Sending message to ${username}...`]);
+
         sendMessage.mutate(
           { recipientUsername: username, content: message },
           {
             onSuccess: () => {
+              // Update to include a success message, replacing "sending..." message
               setOutput([...output, `Message whispered to ${username}`]);
             },
             onError: (error) => {
+              // Keep "sending..." and add an error message if there's an issue
               setOutput([
                 ...output,
                 `Error whispering to ${username}: ${error.message}`,
@@ -658,17 +675,53 @@ export default function Interface() {
 
         break;
       }
+
       case "messages":
-        if (getMessages) {
+        if (getMessages && getMessages.length > 0) {
           getMessages.forEach((message) => {
-            const sender = getSender(message.senderId);
-            setOutput([...output, `From: ${sender} | ${message.content}`]);
+            const senderInfo = message.senderUsername || "Unknown sender";
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `From: ${senderInfo} | ${message.content} | Id: ${message.id}`,
+            ]);
           });
         } else {
           setOutput([...output, "No messages found"]);
         }
         break;
-      
+      case "message":
+        if (args[1] === "rm") {
+          if (!args[2]) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Missing message id. Usage: message delete [message id]`,
+            ]);
+            break;
+          }
+          messageDeleteHandler.mutate(args[2]);
+          if (messageDeleteHandler.isSuccess) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Message deleted",
+            ]);
+          } else if (!messageDeleteHandler.isError) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error deleting message, check the id",
+            ]);
+          }
+          break;
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Unknown command: ${cmd} ${args[1]}`,
+          ]);
+        }
+        break;
       case "viewnotes":
         const noteTitles = fetchAllNotes();
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
@@ -691,9 +744,9 @@ export default function Interface() {
       case "copylast":
         await handleCopyLastCommand(cmd, args);
         break;
-      case "togglelines":
-        handleToggleLinesCommand();
-        break;
+      // case "togglelines":
+      //   handleToggleLinesCommand();
+      //   break;
       case "bm":
         handleBookmarkCommand(cmd, args);
         break;
@@ -725,6 +778,7 @@ export default function Interface() {
           ]);
           break;
         }
+
         if (!args[3]) {
           setOutput((prevOutput) => [
             ...prevOutput,
@@ -967,14 +1021,16 @@ export default function Interface() {
     }
   };
 
-  const handleToggleLinesCommand = () => {
-    localStorage.setItem(
-      "lineNumber",
-      localStorage.getItem("lineNumber") === "showLines"
-        ? "hideLines"
-        : "showLines" || "showLines",
-    );
-  };
+  // Currently puts the formatting all out of whack
+
+  // const handleToggleLinesCommand = () => {
+  //   localStorage.setItem(
+  //     "lineNumber",
+  //     localStorage.getItem("lineNumber") === "showLines"
+  //       ? "hideLines"
+  //       : "showLines" || "showLines",
+  //   );
+  // };
 
   const handleBookmarkCommand = (cmd: string, args: string[]) => {
     if (args.length === 0) {

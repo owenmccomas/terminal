@@ -79,28 +79,27 @@ model User {
     posts            Post[]
     notes            Note[]
     bookmarks        Bookmark[]
-    macros           Macro[] 
-    files            File[] 
+    macros           Macro[]
+    files            File[]
     username         String?    @unique
     sentMessages     Message[]  @relation(name: "MessageSender")
     receivedMessages Message[]  @relation(name: "MessageRecipient")
 }
 
 model Message {
-  id          Int      @id @default(autoincrement())
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  senderId    String   
-  recipientId String   
-  readStatus  Boolean  @default(false)
+    id          Int      @id @default(autoincrement())
+    content     String
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    senderId    String
+    recipientId String
+    readStatus  Boolean  @default(false)
 
-  sender      User     @relation(name: "MessageSender", fields: [senderId], references: [id])
-  recipient   User     @relation(name: "MessageRecipient", fields: [recipientId], references: [id])
+    sender    User @relation(name: "MessageSender", fields: [senderId], references: [id])
+    recipient User @relation(name: "MessageRecipient", fields: [recipientId], references: [id])
 
-  @@index([senderId, recipientId])
+    @@index([senderId, recipientId])
 }
-
 
 model VerificationToken {
     identifier String
