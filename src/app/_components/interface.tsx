@@ -3,11 +3,19 @@ import { useState, useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { signIn } from "next-auth/react";
-
+import { UploadButton } from "./uploadthing";
 import { api } from "~/trpc/react";
 
 import BootSequence from "./boot-sequence";
+
 import { getStockPrice } from "utils/stocks";
+
+import { useUploadThing } from "../hooks/uploadthing";
+import { File } from "@prisma/client";
+import { create } from "domain";
+import { set } from "zod";
+import { get } from "http";
+
 
 export default function Interface() {
   const [input, setInput] = useState("");
@@ -20,6 +28,8 @@ export default function Interface() {
   const [noteContent, setNoteContent] = useState("");
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
   const [textColor, setTextColor] = useState("#f59e0b");
+  const [newFileName, setNewFileName] = useState<string | null>(null);
+  const [fileToGrab, setFileToGrab] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
@@ -36,9 +46,43 @@ export default function Interface() {
     },
   });
 
+  const grabbedFile = api.file.grab.useQuery({ fileId: fileToGrab });
+
+  const { data: files } =
+    api.file.getAll.useQuery({ userId: session.data?.user.id! }) || [];
+
+  const newUploadHandler = api.file.upload.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
+  useEffect(() => {}, [grabbedFile.data]);
+
+  const { startUpload, permittedFileInfo } = useUploadThing("imageUploader", {
+    onClientUploadComplete: () => {
+      setOutput((prevOutput) => [
+        ...prevOutput,
+        `> File uploaded successfully`,
+      ]);
+    },
+    onUploadError: () => {
+      setOutput((prevOutput) => [...prevOutput, `> Error uploading file`]);
+    },
+    onUploadBegin: () => {
+      setOutput((prevOutput) => [...prevOutput, `> Uploading file...`]);
+    },
+  });
+
   const userMacros = api.macro.list.useQuery({
     userId: session.data?.user.id,
   }).data;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const triggerFileInputClick = () => {
+    fileInputRef.current?.click();
+  };
 
   useEffect(() => {
     const loadingDuration = 60000; // 60 seconds
@@ -82,19 +126,6 @@ export default function Interface() {
     setInput(event.target.value);
   };
 
-  const handleInputSubmit = async (
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (event.key === "Enter") {
-      if (isCreatingNote) {
-        processNewNote(input);
-      } else {
-        await processCommand(input);
-      }
-      setInput("");
-    }
-  };
-
   const createNoteMutation = api.note.createNote.useMutation({
     onSuccess: () => {
       // Actions to perform on successful note creation
@@ -106,7 +137,7 @@ export default function Interface() {
       setNoteContent("");
       setIsCreatingNote(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       // Actions to perform on error
       console.error(error);
       setOutput((prevOutput) => [...prevOutput, `> Error saving note`]);
@@ -121,7 +152,7 @@ export default function Interface() {
       console.error("Error fetching notes", notesError);
       return ["Error fetching notes"];
     }
-    return allNotes?.map((note) => note.title) ?? [];
+    return allNotes?.map((note: { title: any }) => note.title) ?? [];
   };
 
   const { data: selectedNote, isLoading: isLoadingSelectedNote } =
@@ -174,7 +205,7 @@ export default function Interface() {
     if (!session.data) throw new Error("User not signed in");
     if (!bookmarks) throw new Error("Bookmarks not loaded");
     const bookmarkId = bookmarks?.find(
-      (bookmark) => bookmark.name === name,
+      (bookmark: { name: string }) => bookmark.name === name,
     )?.id;
     if (!bookmarkId) throw new Error("Bookmark not found");
     deleteBookmarkHandler.mutate({ id: bookmarkId });
@@ -200,12 +231,12 @@ export default function Interface() {
     }
   }
 
-  function getTextStyle(color: string) {
+  const getTextStyle = (color: string) => {
     return {
       color: color,
       textShadow: `0 0 8px ${color}, 0 0 10px ${color}`,
     };
-  }
+  };
 
   const changeTextColor = (color: string) => {
     setTextColor(color);
@@ -219,6 +250,12 @@ export default function Interface() {
     }
     // Rest of your useEffect code
   }, []);
+
+  useEffect(() => {
+    if (fileToGrab) {
+      grabbedFile.refetch();
+    }
+  }, [fileToGrab]);
 
   useEffect(() => {
     const totalTime = 1200; // Total time for loading in milliseconds (1.2 seconds)
@@ -239,6 +276,188 @@ export default function Interface() {
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
 
+  const uploadFile = async () => {
+    if (fileInputRef.current?.files?.length) {
+      if (!session.data?.user) {
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> file upload`,
+          `You are not signed in`,
+        ]);
+        return;
+      }
+      const file = await startUpload([fileInputRef.current?.files[0]!]);
+      if (!file || !file[0]) {
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> file upload`,
+          `Error uploading file`,
+        ]);
+        return;
+      }
+      newUploadHandler.mutate({
+        file: {
+          name: newFileName!,
+          url: file[0].url,
+        },
+        userId: session.data?.user.id!,
+      });
+      setNewFileName(null);
+    }
+  };
+
+  const handleUploadCommand = async (cmd: string, args: string[]) => {
+    // we need upload, list, and delete commands.
+
+    switch (args[1]) {
+      case "upload":
+        if (!session.data?.user) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} upload`,
+            `You are not signed in`,
+          ]);
+          break;
+        }
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} upload`,
+            `Missing file name. Usage: file upload [file name]`,
+          ]);
+          break;
+        }
+        setNewFileName(args[2]);
+        triggerFileInputClick();
+        break;
+
+      case "list":
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd} list`,
+          `Listing files...`,
+        ]);
+
+        if (files?.length) {
+          files.forEach((file: { name: string; url: string; id: string }) => {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${file.name} | filetype: ${file.url.split(".").pop()} | fileId: ${file.id} |`,
+            ]);
+          });
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} list`,
+            `No files found`,
+          ]);
+        }
+        break;
+
+      case "grab":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} grab`,
+            `Missing file id. Usage: file grab [file id]`,
+          ]);
+          break;
+        }
+        setFileToGrab(args[2]);
+        const file = await grabbedFile.refetch();
+        if (file.data.url) {
+          window.open(file.data.url, "_blank");
+        }
+        break;
+
+      case "getid":
+        if (!args[2]) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `Missing file name. Usage: file getid [file name]`,
+          ]);
+          break;
+        }
+        const fileToGetId = files?.find((file: File) => file.name === args[2]);
+        if (fileToGetId) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `${fileToGetId.id}`,
+          ]);
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} getid`,
+            `File not found`,
+          ]);
+        }
+        break;
+
+      default:
+        setOutput((prevOutput) => [
+          ...prevOutput,
+          `> ${cmd}`,
+          `Unknown command: ${cmd}`,
+        ]);
+    }
+  };
+
+  const createUsernameHander = api.username.createUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+    onError: (error) => {
+      setOutput((prevOutput) => [...prevOutput, `Error: ${error.message}`]);
+    },
+  });
+
+  const updateUsernameHandler = api.username.updateUsername.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+    onError: (error) => {
+      setOutput((prevOutput) => [...prevOutput, `Error: ${error.message}`]);
+    },
+  });
+
+  const createUsername = (userId: string, username: string) => {
+    createUsernameHander.mutate({ userId: session.data?.user.id!, username });
+    setOutput((prevOutput) => [...prevOutput, `Username created: ${username}`]);
+  };
+
+  const updateUsername = (userId: string, newUsername: string) => {
+    updateUsernameHandler.mutate({
+      userId: session.data?.user.id!,
+      newUsername: newUsername,
+    });
+
+    setOutput((prevOutput) => [
+      ...prevOutput,
+      `Username updated to: ${newUsername}`,
+    ]);
+  };
+
+  const sendMessage = api.message.sendMessage.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+  const usernameQuery = api.username.getUsername.useQuery({
+    userId: session.data?.user.id!,
+  }).data?.username;
+
+  const getMessages = api.message.getUserMessages.useQuery(
+    session.data?.user.id!,
+  ).data;
+
+  const messageDeleteHandler = api.message.deleteMessage.useMutation({
+    onSuccess: async () => {
+      await context.invalidate();
+    },
+  });
+
   const processCommand = async (command: string) => {
     const args = command.split(" ");
     const cmd = args[0]?.toLowerCase() ?? "";
@@ -246,32 +465,40 @@ export default function Interface() {
 
     switch (cmd) {
       case "help":
-        setOutput((prevOutput) => [
-          ...prevOutput,
-          `> ${cmd}`,
-          "Available commands:",
-          "  help        - Displays this help message.",
-          "  clear       - Clears the terminal output.",
-          "  about       - Shows information about this terminal-like interface.",
-          "  date        - Displays the current date.",
-          "  time        - Displays the current time.",
-          "  echo        - Repeats back the text you enter. Usage: echo [text]",
-          "  signin      - Signs in a user. If already signed in, displays a welcome back message.",
-          "  signout     - Signs out the current user and displays a goodbye message.",
-          "  whoami      - Shows the name of the currently signed in user, or a message if not signed in.",
-          "  newnote     - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
-          "  viewnotes   - Lists titles of all available notes.",
-          "  view        - Selects a note for viewing based on the title. Usage: view [note title]",
-          "  bot         - Interacts with an AI bot. Usage: bot ask [your question]",
-          "  draw        - Generates ASCII art based on a prompt. Usage: draw [prompt]",
-          "  search      - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
-          "  copylast    - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
-          "  togglelines - Toggles the display of line numbers in the terminal.",
-          "  bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
-          "  color       - Changes the text color of the terminal. Usage: color [hex color code]",
-          "",
-          "Note: Some commands require user authentication (signin). Ensure you are signed in to use all features.",
-        ]);
+        const helpCommands = [
+          "Commands:",
+          "about       - Shows information about this terminal-like interface.",
+          "bm          - Bookmark management. Subcommands: -add, -ls, -rm. Usage: bm [subcommand] [args]",
+          "bot         - Interacts with an AI bot. Usage: bot ask [your question]",
+          "clear       - Clears the terminal output.",
+          "color       - Changes the text color of the terminal. Usage: color [hex color code] Note: This is stored in localStorage, so it will persist between sessions, but not devices.",
+          "copylast    - Copies the specified number of last lines from the terminal output to the clipboard. Usage: copylast [number of lines]",
+          "date        - Displays the current date.",
+          "draw        - Generates ASCII art based on a prompt. Usage: draw [prompt]",
+          "echo        - Repeats back the text you enter. Usage: echo [text]",
+          "file        - File management. Subcommands: upload, list, grab. Usage: file [subcommand] [args]",
+          "help        - Displays this help message.",
+          "macro       - Macro management. Subcommands: -create, -ls, -rm. Usage: macro [subcommand] [args]",
+          "messages    - View messages sent to you.",
+          "newnote     - Starts the process to create a new note. Requires being signed in. Usage: newnote [follow prompts]",
+          "open        - Opens a URL in a new tab. Usage: open [URL]",
+          "search      - Searches the web for a query and opens the results in a new tab. Usage: search [query]",
+          "signin      - Signs in a user. If already signed in, displays a welcome back message.",
+          "signout     - Signs out the current user and displays a goodbye message.",
+          "time        - Displays the current time.",
+          "togglelines - Toggles the display of line numbers in the terminal.",
+          "username    - Manage your username. Subcommands: -create, -edit. Usage: username [subcommand] [args]",
+          "view        - Selects a note for viewing based on the title. Usage: view [note title]",
+          "viewnotes   - Lists titles of all available notes.",
+          "whisper     - Send a direct message to another user. Usage: whisper <username> '<message>'",
+          "whoami      - Shows the name and username of the currently signed in user, or a message if not signed in.",
+        ];
+
+        helpCommands.forEach((command, index) => {
+          setTimeout(() => {
+            setOutput((prevOutput) => [...prevOutput, `${command}`]);
+          }, index * 37);
+        });
         break;
 
       case "clear":
@@ -281,7 +508,9 @@ export default function Interface() {
         setOutput((prevOutput) => [
           ...prevOutput,
           `> ${cmd}`,
-          "This is a terminal-like interface built by Owen McComas.",
+          "This is a terminal-like interface for your life. It is a work in progress. Visit the GitHub repository for more information",
+          "Use command 'copylast' to grab the URL",
+          "https://github.com/owenmccomas/terminal",
         ]);
         break;
       case "date":
@@ -299,7 +528,19 @@ export default function Interface() {
         ]);
         break;
       case "echo":
-        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, cmdArgs]);
+        const normalizedCmdArgs = cmdArgs.toLowerCase().replace(/[?]/g, "");
+        if (
+          normalizedCmdArgs ===
+          "what's it like to hold the hand of someone you love"
+        ) {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd} What's it like to hold the hand of someone you love?`,
+            "Interlinked",
+          ]);
+        } else {
+          setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, cmdArgs]);
+        }
         break;
       case "signin":
         setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, "Checking..."]);
@@ -329,6 +570,7 @@ export default function Interface() {
             ...prevOutput,
             `> ${cmd}`,
             `You are ${session.data?.user.name}`,
+            `Username: ${usernameQuery}`,
           ]);
         } else
           setOutput((prevOutput) => [
@@ -353,6 +595,7 @@ export default function Interface() {
           ]);
         }
         break;
+
       // Inside processCommand function in Interface.tsx
       case "stock":
         const stockData = await getStockPrice(cmdArgs.toUpperCase());
@@ -371,6 +614,135 @@ export default function Interface() {
           setOutput((prevOutput) => [
             ...prevOutput,
             `> Error fetching data for ${cmdArgs}`,
+          ]);
+        }
+        break;
+
+
+      case "username":
+        if (args[1] === "-create") {
+          if (!args[2]) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for creation",
+            ]);
+            return;
+          }
+          // Check if user id is defined before passing it to createUsername
+          if (session.data?.user?.id) {
+            createUsername(session.data.user.id, args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing user id for creation",
+            ]);
+          }
+        } else if (args[1] === "-edit") {
+          if (!args[2]) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing username for creation",
+            ]);
+            return;
+          }
+          // Check if user id is defined before passing it to updateUsername
+          if (session.data?.user?.id) {
+            updateUsername(session.data.user.id, args[2]);
+          } else {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error: Missing user id for editing",
+            ]);
+          }
+        } else {
+          // Handle the case where the subcommand is not recognized
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            "Error: Invalid subcommand for 'username'",
+          ]);
+        }
+        break;
+
+      case "whisper": {
+        const [_, username, message] = input
+          .split(/(^\w+\s+)(\w+)\s+(.*)$/)
+          .filter(Boolean);
+        if (!username || !message) {
+          setOutput([...output, 'Usage: whisper <username> "<message>"']);
+          break;
+        }
+
+        // Add "sending..." message before initiating the send operation
+        setOutput([...output, `Sending message to ${username}...`]);
+
+        sendMessage.mutate(
+          { recipientUsername: username, content: message },
+          {
+            onSuccess: () => {
+              // Update to include a success message, replacing "sending..." message
+              setOutput([...output, `Message whispered to ${username}`]);
+            },
+            onError: (error) => {
+              // Keep "sending..." and add an error message if there's an issue
+              setOutput([
+                ...output,
+                `Error whispering to ${username}: ${error.message}`,
+              ]);
+            },
+          },
+        );
+
+        break;
+      }
+
+      case "messages":
+        if (getMessages && getMessages.length > 0) {
+          getMessages.forEach((message) => {
+            const senderInfo = message.senderUsername || "Unknown sender";
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `From: ${senderInfo} | ${message.content} | Id: ${message.id}`,
+            ]);
+          });
+        } else {
+          setOutput([...output, "No messages found"]);
+        }
+        break;
+      case "message":
+        if (args[1] === "rm") {
+          if (!args[2]) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Missing message id. Usage: message delete [message id]`,
+            ]);
+            break;
+          }
+          messageDeleteHandler.mutate(args[2]);
+          if (messageDeleteHandler.isSuccess) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Message deleted",
+            ]);
+          } else if (!messageDeleteHandler.isError) {
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              "Error deleting message, check the id",
+            ]);
+          }
+          break;
+        } else {
+          setOutput((prevOutput) => [
+            ...prevOutput,
+            `> ${cmd}`,
+            `Unknown command: ${cmd} ${args[1]}`,
           ]);
         }
         break;
@@ -397,9 +769,9 @@ export default function Interface() {
       case "copylast":
         await handleCopyLastCommand(cmd, args);
         break;
-      case "togglelines":
-        handleToggleLinesCommand();
-        break;
+      // case "togglelines":
+      //   handleToggleLinesCommand();
+      //   break;
       case "bm":
         handleBookmarkCommand(cmd, args);
         break;
@@ -408,6 +780,9 @@ export default function Interface() {
         break;
       case "macro":
         handleMacroCommand(cmd, args);
+        break;
+      case "file":
+        handleUploadCommand(cmd, args);
         break;
       default:
         handleUnknownCommand(cmd);
@@ -428,6 +803,7 @@ export default function Interface() {
           ]);
           break;
         }
+
         if (!args[3]) {
           setOutput((prevOutput) => [
             ...prevOutput,
@@ -454,7 +830,7 @@ export default function Interface() {
             `No macros found`,
           ]);
         } else {
-          userMacros?.forEach((macro, index) => {
+          userMacros?.forEach((macro: { name: any }, index: number) => {
             setTimeout(() => {
               setOutput((prevOutput) => [...prevOutput, `> ${macro.name}`]);
             }, index * 100); // 100 milliseconds delay for each item
@@ -472,7 +848,9 @@ export default function Interface() {
           break;
         }
         const macroToRemove = args[2]?.replace(/^"|"$/g, "");
-        const macroId = userMacros?.find((b) => b.name === macroToRemove)?.id;
+        const macroId = userMacros?.find(
+          (b: { name: string }) => b.name === macroToRemove,
+        )?.id;
         if (!macroId) {
           setOutput((prevOutput) => [...prevOutput, `> macro not found`]);
           break;
@@ -486,11 +864,13 @@ export default function Interface() {
       default:
         // Treat as a macro name to open
         const macroNameToUse = macroArg.replace(/^"|"$/g, ""); // Remove quotes
-        const macro = userMacros?.find((b) => b.name === macroNameToUse);
+        const macro = userMacros?.find(
+          (b: { name: string }) => b.name === macroNameToUse,
+        );
         console.log(macro?.macros);
 
         if (macro) {
-          macro.macros.forEach((command, index) => {
+          macro.macros.forEach((command: string, index: number) => {
             setTimeout(() => {
               processCommand(command.trim());
             }, index * 100); // 100 milliseconds delay for each item
@@ -584,6 +964,19 @@ export default function Interface() {
     ]);
   };
 
+  const handleInputSubmit = async (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === "Enter") {
+      if (isCreatingNote) {
+        processNewNote(input);
+      } else {
+        await processCommand(input);
+      }
+      setInput("");
+    }
+  };
+
   const handleOpenCommand = (cmd: string, args: string[]) => {
     // check if https is included, and if not, automatically add it then open it in a new window
     if (!args[1]) {
@@ -653,14 +1046,16 @@ export default function Interface() {
     }
   };
 
-  const handleToggleLinesCommand = () => {
-    localStorage.setItem(
-      "lineNumber",
-      localStorage.getItem("lineNumber") === "showLines"
-        ? "hideLines"
-        : "showLines" || "showLines",
-    );
-  };
+  // Currently puts the formatting all out of whack
+
+  // const handleToggleLinesCommand = () => {
+  //   localStorage.setItem(
+  //     "lineNumber",
+  //     localStorage.getItem("lineNumber") === "showLines"
+  //       ? "hideLines"
+  //       : "showLines" || "showLines",
+  //   );
+  // };
 
   const handleBookmarkCommand = (cmd: string, args: string[]) => {
     if (args.length === 0) {
@@ -710,20 +1105,23 @@ export default function Interface() {
         } else {
           // Find the length of the longest bookmark name
           const maxLength = bookmarks?.reduce(
-            (max, bookmark) => Math.max(max, bookmark.name.length),
+            (max: number, bookmark: { name: string | any[] }) =>
+              Math.max(max, bookmark.name.length),
             0,
           );
 
           // Add a slight delay between each bookmark
-          bookmarks?.forEach((bookmark, index) => {
-            setTimeout(() => {
-              const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
-              setOutput((prevOutput) => [
-                ...prevOutput,
-                `> ${paddedName} | ${bookmark.url}`,
-              ]);
-            }, index * 100); // 100 milliseconds delay for each item
-          });
+          bookmarks?.forEach(
+            (bookmark: { name: string; url: any }, index: number) => {
+              setTimeout(() => {
+                const paddedName = bookmark.name.padEnd(maxLength!, " "); // Pad the name
+                setOutput((prevOutput) => [
+                  ...prevOutput,
+                  `> ${paddedName} | ${bookmark.url}`,
+                ]);
+              }, index * 100); // 100 milliseconds delay for each item
+            },
+          );
         }
         break;
 
@@ -746,7 +1144,9 @@ export default function Interface() {
       default:
         // Treat as a bookmark name to open
         const bookmarkNameToUse = args.slice(1).join(" ").replace(/^"|"$/g, ""); // Join arguments and remove quotes
-        const bookmark = bookmarks?.find((b) => b.name === bookmarkNameToUse);
+        const bookmark = bookmarks?.find(
+          (b: { name: string }) => b.name === bookmarkNameToUse,
+        );
 
         if (bookmark) {
           window.open(bookmark.url, "_blank");
@@ -863,6 +1263,12 @@ export default function Interface() {
           </pre>
         </div>
       </div>
+      <input
+        type="file"
+        style={{ display: "none" }}
+        ref={fileInputRef}
+        onChange={uploadFile}
+      />
     </main>
   );
 }
