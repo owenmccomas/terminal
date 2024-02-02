@@ -16,7 +16,6 @@ import { create } from "domain";
 import { set } from "zod";
 import { get } from "http";
 
-
 export default function Interface() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState<string[]>([]);
@@ -30,6 +29,7 @@ export default function Interface() {
   const [textColor, setTextColor] = useState("#f59e0b");
   const [newFileName, setNewFileName] = useState<string | null>(null);
   const [fileToGrab, setFileToGrab] = useState<string | undefined>(undefined);
+  const [shouldFetchNote, setShouldFetchNote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const context = api.useUtils();
@@ -129,6 +129,7 @@ export default function Interface() {
   const createNoteMutation = api.note.createNote.useMutation({
     onSuccess: () => {
       // Actions to perform on successful note creation
+      context.invalidate();
       setOutput((prevOutput) => [
         ...prevOutput,
         `> Note titled '${noteTitle}' saved.`,
@@ -161,7 +162,7 @@ export default function Interface() {
     });
 
   useEffect(() => {
-    if (!isLoadingSelectedNote) {
+    if (!isLoadingSelectedNote && shouldFetchNote) {
       if (selectedNoteTitle && selectedNote) {
         // Note is found
         setOutput((prevOutput) => [
@@ -177,8 +178,16 @@ export default function Interface() {
           "Note not found",
         ]);
       }
+      setShouldFetchNote(false); // Reset the flag after handling
     }
-  }, [selectedNote, selectedNoteTitle, isLoadingSelectedNote]);
+  }, [selectedNote, selectedNoteTitle, isLoadingSelectedNote, shouldFetchNote]);
+
+  // Remember to reset `shouldFetchNote` when appropriate, such as when the component unmounts
+  useEffect(() => {
+    return () => {
+      setShouldFetchNote(false); // Cleanup action
+    };
+  }, []);
 
   const addBookmarkHandler = api.bookmark.add.useMutation({
     onSuccess: async () => {
@@ -579,24 +588,23 @@ export default function Interface() {
             `You are not signed in`,
           ]);
         break;
-      case "newnote":
-        if (!session.data) {
-          setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd}`,
-            `You are not signed in`,
-          ]);
-        } else {
-          setIsCreatingNote(true);
-          setOutput((prevOutput) => [
-            ...prevOutput,
-            `> ${cmd}`,
-            `Title your new note:`,
-          ]);
-        }
-        break;
+      // case "newnote":
+      //   if (!session.data) {
+      //     setOutput((prevOutput) => [
+      //       ...prevOutput,
+      //       `> ${cmd}`,
+      //       `You are not signed in`,
+      //     ]);
+      //   } else {
+      //     setIsCreatingNote(true);
+      //     setOutput((prevOutput) => [
+      //       ...prevOutput,
+      //       `> ${cmd}`,
+      //       `Title your new note:`,
+      //     ]);
+      //   }
+      //   break;
 
-      // Inside processCommand function in Interface.tsx
       case "stock":
         const stockData = await getStockPrice(cmdArgs.toUpperCase());
         if (stockData) {
@@ -617,7 +625,6 @@ export default function Interface() {
           ]);
         }
         break;
-
 
       case "username":
         if (args[1] === "-create") {
@@ -747,13 +754,52 @@ export default function Interface() {
         }
         break;
 
-      case "viewnotes":
-        const noteTitles = fetchAllNotes();
-        setOutput((prevOutput) => [...prevOutput, `> ${cmd}`, ...noteTitles]);
+      case "notes":
+        const notesCmdArg = args[1];
+        switch (notesCmdArg) {
+          case "-ls": // List all notes
+            const noteTitles = fetchAllNotes();
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd} ${notesCmdArg}`,
+              ...noteTitles,
+            ]);
+            break;
+          case "-touch": // Create a new note
+            if (!session.data) {
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd} ${notesCmdArg}`,
+                `You are not signed in`,
+              ]);
+            } else {
+              setIsCreatingNote(true);
+              setOutput((prevOutput) => [
+                ...prevOutput,
+                `> ${cmd} ${notesCmdArg}`,
+                `Title your new note:`,
+              ]);
+            }
+            break;
+          case "-view": // View a specific note
+            const noteName = args.slice(2).join(" ");
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd} ${notesCmdArg} ${noteName}`,
+              `Loading note...`,
+            ]);
+            setSelectedNoteTitle(noteName);
+            setShouldFetchNote(true);
+            break;
+          default:
+            setOutput((prevOutput) => [
+              ...prevOutput,
+              `> ${cmd}`,
+              `Unknown notes command: ${notesCmdArg}`,
+            ]);
+        }
         break;
-      case "view":
-        setSelectedNoteTitle(cmdArgs);
-        break;
+
       case "bot":
         await handleBotCommand(cmd, args);
         break;
