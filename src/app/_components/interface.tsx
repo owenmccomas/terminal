@@ -448,10 +448,6 @@ export default function Interface() {
     session.data?.user.id!,
   ).data;
 
-  const senderHandler = api.message.findUsernameBySenderId.useQuery(
-    getMessages?.[0]?.senderId ?? "",
-  ).data;
-
   const messageDeleteHandler = api.message.deleteMessage.useMutation({
     onSuccess: async () => {
       await context.invalidate();
